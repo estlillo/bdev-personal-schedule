@@ -44,6 +44,11 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, "Validation error", ex.getMessage(), ErrorCode.VALIDATION_ERROR, request);
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    ProblemDetail handleIllegalArgument(IllegalArgumentException ex, NativeWebRequest request) {
+        return problem(HttpStatus.BAD_REQUEST, "Validation error", ex.getMessage(), ErrorCode.VALIDATION_ERROR, request);
+    }
+
     private ProblemDetail problem(HttpStatus status, String title, String detail, ErrorCode code, NativeWebRequest request) {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, detail);
         problemDetail.setTitle(title);
