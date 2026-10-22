@@ -35,6 +35,12 @@ En `src/main/resources/application.properties`:
 - `availability.max-returned-slots=500`
 - `availability.default-step-minutes=15`
 
+## Datos ficticios para pruebas funcionales
+
+- Script: `src/main/resources/db/seed/functional_seed.sql`
+- Cubre: profesionales, working windows, excepciones, calendar events, reservas y enlaces multi-profesional.
+- El script hace reset seguro (orden FK) y luego inserta un dataset completo para pruebas manuales.
+
 ## Ejecutar
 
 ```powershell
