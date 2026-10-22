@@ -75,6 +75,28 @@ public class JdbcAvailabilityQueryRepository implements AvailabilityQueryReposit
             .list();
     }
 
+    @Override
+    public List<ReservationRow> findActiveReservations(List<UUID> professionalIds, LocalDateTime fromInclusive, LocalDateTime toExclusive) {
+        if (professionalIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbcClient.sql("""
+                SELECT rp.professional_id, r.starts_at, r.ends_at
+                FROM reservation r
+                JOIN reservation_professional rp ON rp.reservation_id = r.id
+                WHERE rp.professional_id IN (:professionalIds)
+                  AND r.status IN ('HOLD', 'CONFIRMED')
+                  AND r.starts_at < :toExclusive
+                  AND r.ends_at > :fromInclusive
+                ORDER BY rp.professional_id ASC, r.starts_at ASC
+            """)
+            .param("professionalIds", stringifyIds(professionalIds))
+            .param("fromInclusive", fromInclusive.toString())
+            .param("toExclusive", toExclusive.toString())
+            .query(this::mapReservation)
+            .list();
+    }
+
     private List<String> stringifyIds(List<UUID> professionalIds) {
         return professionalIds.stream().map(UUID::toString).toList();
     }
@@ -105,5 +127,12 @@ public class JdbcAvailabilityQueryRepository implements AvailabilityQueryReposit
             LocalDateTime.parse(rs.getString("ends_at"))
         );
     }
-}
 
+    private ReservationRow mapReservation(ResultSet rs, int rowNum) throws SQLException {
+        return new ReservationRow(
+            UUID.fromString(rs.getString("professional_id")),
+            LocalDateTime.parse(rs.getString("starts_at")),
+            LocalDateTime.parse(rs.getString("ends_at"))
+        );
+    }
+}

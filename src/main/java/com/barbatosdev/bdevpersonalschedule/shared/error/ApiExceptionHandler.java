@@ -54,6 +54,16 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.CONFLICT, "Schedule conflict", ex.getMessage(), ex.getCode(), request);
     }
 
+    @ExceptionHandler(OutsideWorkingHoursException.class)
+    ProblemDetail handleOutsideWorkingHours(OutsideWorkingHoursException ex, NativeWebRequest request) {
+        return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Outside working hours", ex.getMessage(), ex.getCode(), request);
+    }
+
+    @ExceptionHandler(InvalidStatusTransitionException.class)
+    ProblemDetail handleInvalidStatusTransition(InvalidStatusTransitionException ex, NativeWebRequest request) {
+        return problem(HttpStatus.CONFLICT, "Invalid status transition", ex.getMessage(), ex.getCode(), request);
+    }
+
     private ProblemDetail problem(HttpStatus status, String title, String detail, ErrorCode code, NativeWebRequest request) {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, detail);
         problemDetail.setTitle(title);
@@ -68,4 +78,3 @@ public class ApiExceptionHandler {
         return fieldError.getField() + " " + fieldError.getDefaultMessage();
     }
 }
-

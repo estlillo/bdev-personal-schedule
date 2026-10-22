@@ -100,6 +100,7 @@ class AvailabilityServiceTest {
                 LocalDateTime.parse("2026-10-19T09:00:00")
             )
         ));
+        when(repository.findActiveReservations(anyList(), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of());
 
         AvailabilitySearchResult result = service.search(new AvailabilitySearchCommand(
             List.of(professionalId),
@@ -140,6 +141,7 @@ class AvailabilityServiceTest {
         ));
         when(repository.findExceptions(anyList(), any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of());
         when(repository.findCalendarEvents(anyList(), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of());
+        when(repository.findActiveReservations(anyList(), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of());
 
         AvailabilitySearchResult result = service.search(new AvailabilitySearchCommand(
             List.of(professionalA, professionalB),

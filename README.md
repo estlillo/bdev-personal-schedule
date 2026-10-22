@@ -1,11 +1,12 @@
-# Rehab Scheduler Backend (Fases 1-4)
+# Rehab Scheduler Backend (Fases 1-5)
 
-Backend en Java 17 + Spring Boot 4 con avance hasta Fase 4 del plan:
+Backend en Java 17 + Spring Boot 4 con avance hasta Fase 5 del plan:
 
 - Fase 1: CRUD de profesionales.
 - Fase 2: working windows semanales y excepciones (`BLOCK`/`ADD`).
 - Fase 3: calendar events bloqueantes.
 - Fase 4: motor de disponibilidad (`merge`, `subtract`, `intersect`, generacion de slots).
+- Fase 5: reservas atomicas multi-profesional (`HOLD`, `CONFIRMED`, `CANCELLED`).
 
 ## Stack y base tecnica
 
@@ -17,11 +18,13 @@ Backend en Java 17 + Spring Boot 4 con avance hasta Fase 4 del plan:
 
 ## Endpoints principales
 
-- `POST /api/v1/availability/search`
 - `GET/POST/PATCH /api/v1/professionals`
 - `GET/PUT /api/v1/professionals/{id}/working-windows`
 - `GET/POST/DELETE /api/v1/professionals/{id}/exceptions`
 - `GET/POST/PATCH/DELETE /api/v1/calendar-events`
+- `POST /api/v1/availability/search`
+- `GET/POST /api/v1/reservations`
+- `PATCH /api/v1/reservations/{id}/status`
 
 ## Configuracion de disponibilidad
 

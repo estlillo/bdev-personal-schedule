@@ -71,12 +71,25 @@ public class AvailabilityService {
             fromInclusive,
             toExclusive
         );
+        List<AvailabilityQueryRepository.ReservationRow> activeReservations = repository.findActiveReservations(
+            professionalIds,
+            fromInclusive,
+            toExclusive
+        );
 
         Map<UUID, List<TimeInterval>> freeIntervalsByProfessional = new HashMap<>();
         for (UUID professionalId : professionalIds) {
             freeIntervalsByProfessional.put(
                 professionalId,
-                buildProfessionalAvailability(professionalId, command.startDate(), command.endDate(), windows, exceptions, events)
+                buildProfessionalAvailability(
+                    professionalId,
+                    command.startDate(),
+                    command.endDate(),
+                    windows,
+                    exceptions,
+                    events,
+                    activeReservations
+                )
             );
         }
 
@@ -109,7 +122,8 @@ public class AvailabilityService {
         LocalDate to,
         List<AvailabilityQueryRepository.WorkingWindowRow> allWindows,
         List<AvailabilityQueryRepository.ScheduleExceptionRow> allExceptions,
-        List<AvailabilityQueryRepository.CalendarEventRow> allEvents
+        List<AvailabilityQueryRepository.CalendarEventRow> allEvents,
+        List<AvailabilityQueryRepository.ReservationRow> allReservations
     ) {
         List<AvailabilityQueryRepository.WorkingWindowRow> windows = allWindows.stream()
             .filter(window -> window.professionalId().equals(professionalId))
@@ -119,6 +133,9 @@ public class AvailabilityService {
             .toList();
         List<AvailabilityQueryRepository.CalendarEventRow> events = allEvents.stream()
             .filter(event -> event.professionalId().equals(professionalId))
+            .toList();
+        List<AvailabilityQueryRepository.ReservationRow> reservations = allReservations.stream()
+            .filter(reservation -> reservation.professionalId().equals(professionalId))
             .toList();
 
         Map<Integer, List<AvailabilityQueryRepository.WorkingWindowRow>> windowsByDay = windows.stream()
@@ -160,7 +177,17 @@ public class AvailabilityService {
                 }
             }
 
+            List<TimeInterval> dayReservations = new ArrayList<>();
+            for (AvailabilityQueryRepository.ReservationRow reservation : reservations) {
+                LocalDateTime startsAt = max(dayStart, reservation.startsAt());
+                LocalDateTime endsAt = min(dayEnd, reservation.endsAt());
+                if (startsAt.isBefore(endsAt)) {
+                    dayReservations.add(new TimeInterval(startsAt, endsAt));
+                }
+            }
+
             available = intervalOperations.subtract(available, dayEvents);
+            available = intervalOperations.subtract(available, dayReservations);
             result.addAll(available);
 
             date = date.plusDays(1);
@@ -212,4 +239,3 @@ public class AvailabilityService {
         return a.isAfter(b) ? a : b;
     }
 }
-

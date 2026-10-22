@@ -14,6 +14,8 @@ public interface AvailabilityQueryRepository {
 
     List<CalendarEventRow> findCalendarEvents(List<UUID> professionalIds, LocalDateTime fromInclusive, LocalDateTime toExclusive);
 
+    List<ReservationRow> findActiveReservations(List<UUID> professionalIds, LocalDateTime fromInclusive, LocalDateTime toExclusive);
+
     record WorkingWindowRow(
         UUID professionalId,
         int dayOfWeek,
@@ -37,5 +39,11 @@ public interface AvailabilityQueryRepository {
         LocalDateTime endsAt
     ) {
     }
-}
 
+    record ReservationRow(
+        UUID professionalId,
+        LocalDateTime startsAt,
+        LocalDateTime endsAt
+    ) {
+    }
+}

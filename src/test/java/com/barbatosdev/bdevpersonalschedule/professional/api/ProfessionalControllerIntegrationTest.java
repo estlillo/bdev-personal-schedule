@@ -46,9 +46,13 @@ class ProfessionalControllerIntegrationTest {
     }
 
     @AfterAll
-    static void afterAll() throws IOException {
+    static void afterAll() {
         if (databaseFile != null) {
-            Files.deleteIfExists(databaseFile);
+            try {
+                Files.deleteIfExists(databaseFile);
+            } catch (IOException ignored) {
+                // SQLite file can remain locked briefly on Windows.
+            }
         }
     }
 
@@ -146,4 +150,3 @@ class ProfessionalControllerIntegrationTest {
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 }
-
