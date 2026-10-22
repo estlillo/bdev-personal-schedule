@@ -17,16 +17,40 @@ body {
 }
 
 .page {
-  max-width: 1024px;
-  margin: 0 auto;
-  padding: 1.5rem;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 1.5rem 2rem;
   display: grid;
   gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 1rem;
+  }
 }
 
 .subtitle {
   margin: 0;
   color: #4b5563;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.page-header a {
+  color: #1d4ed8;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.page-header a:hover {
+  text-decoration: underline;
 }
 
 .card {
@@ -56,7 +80,9 @@ label {
 
 input[type='date'],
 input[type='number'],
-input[type='text'] {
+input[type='text'],
+input[type='time'],
+select {
   padding: 0.5rem;
   border-radius: 8px;
   border: 1px solid #d1d5db;
@@ -163,6 +189,14 @@ button:disabled {
   padding: 0.5rem;
 }
 
+.success {
+  color: #166534;
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
 .reservation-result {
   margin-top: 1rem;
   padding: 0.75rem;
@@ -175,3 +209,31 @@ button:disabled {
   display: flex;
   gap: 0.5rem;
 }
+
+.table-like {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.table-row.table-row-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.table-row.table-header-row {
+  font-weight: 700;
+  color: #374151;
+}
+
+.table-row.table-header-row span,
+.table-row span {
+  padding: 0.2rem 0;
+}
+

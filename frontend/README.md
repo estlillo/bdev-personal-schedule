@@ -30,9 +30,17 @@ npm run build
 - Crear reserva en `HOLD`.
 - Confirmar o cancelar la reserva creada.
 
+## Pantalla de disponibilidad por profesional
+- Ruta: `/availability`
+- Permite definir horario semanal (`working windows`).
+- Permite consultar, crear y eliminar excepciones (`BLOCK`/`ADD`).
+
 ## Archivos clave
 - `src/modules/booking/pages/BookingPage.tsx`
 - `src/modules/booking/hooks/useBookingData.ts`
 - `src/modules/booking/api/*.ts`
+- `src/modules/schedule/pages/ProfessionalAvailabilityPage.tsx`
+- `src/modules/schedule/hooks/useScheduleData.ts`
+- `src/modules/schedule/api/schedule.api.ts`
 - `src/shared/api/client.ts`
 - `src/shared/api/problem-details.ts`

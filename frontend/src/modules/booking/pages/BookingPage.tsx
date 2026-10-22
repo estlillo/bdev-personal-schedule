@@ -1,6 +1,7 @@
 import { AxiosError } from 'axios';
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import {
   isProblemDetail,
   toProblemMessage,
@@ -205,7 +206,10 @@ export function BookingPage() {
 
   return (
     <main className="page">
-      <h1>Reserva de horas</h1>
+      <div className="page-header">
+        <h1>Reserva de horas</h1>
+        <Link to="/availability">Definir disponibilidad</Link>
+      </div>
       <p className="subtitle">
         Busca disponibilidad, selecciona un bloque y crea una reserva.
       </p>
