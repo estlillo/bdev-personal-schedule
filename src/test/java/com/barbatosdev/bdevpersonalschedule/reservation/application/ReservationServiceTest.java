@@ -92,6 +92,45 @@ class ReservationServiceTest {
             .isInstanceOf(InvalidStatusTransitionException.class);
     }
 
+    @Test
+    void updateMetadataShouldPersistTrimmedValues() {
+        UUID reservationId = UUID.randomUUID();
+        Reservation existing = reservation(reservationId, ReservationStatus.HOLD);
+        Reservation updated = new Reservation(
+            reservationId,
+            existing.startsAt(),
+            existing.endsAt(),
+            existing.status(),
+            "CASO-NEW",
+            "Nueva descripcion",
+            existing.createdAt(),
+            existing.updatedAt(),
+            existing.professionalIds()
+        );
+
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(existing));
+        when(reservationRepository.updateMetadata(any(), any(), any(), any())).thenReturn(updated);
+
+        Reservation result = reservationService.updateMetadata(
+            reservationId,
+            "  CASO-NEW  ",
+            "  Nueva descripcion  "
+        );
+
+        assertThat(result.referenceCode()).isEqualTo("CASO-NEW");
+        assertThat(result.description()).isEqualTo("Nueva descripcion");
+    }
+
+    @Test
+    void updateMetadataShouldRejectBlankPayload() {
+        UUID reservationId = UUID.randomUUID();
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation(reservationId, ReservationStatus.HOLD)));
+
+        assertThatThrownBy(() -> reservationService.updateMetadata(reservationId, " ", " "))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("referenceCode or description");
+    }
+
     private Professional activeProfessional(UUID id) {
         LocalDateTime now = LocalDateTime.parse("2026-10-12T10:00:00");
         return new Professional(id, "Profesional", "KINE", true, now, now);

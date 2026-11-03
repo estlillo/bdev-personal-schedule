@@ -186,6 +186,25 @@ class ReservationControllerIntegrationTest {
             .andExpect(jsonPath("$.code").value("INVALID_STATUS_TRANSITION"));
     }
 
+    @Test
+    void patchMetadataShouldUpdateReferenceCodeAndDescription() throws Exception {
+        String professionalId = createProfessional("Profesional Edicion");
+        configureFullDayWindow(professionalId);
+        String reservationId = createReservation(professionalId, "2026-10-19T10:00:00", "2026-10-19T10:45:00");
+
+        mockMvc.perform(patch("/api/v1/reservations/{id}", reservationId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "referenceCode":"CASO-EDITADO",
+                      "description":"Descripcion actualizada"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.referenceCode").value("CASO-EDITADO"))
+            .andExpect(jsonPath("$.description").value("Descripcion actualizada"));
+    }
+
     private String createProfessional(String name) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/professionals")
                 .contentType(MediaType.APPLICATION_JSON)

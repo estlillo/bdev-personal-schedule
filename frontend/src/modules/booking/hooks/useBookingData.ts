@@ -8,6 +8,7 @@ import {
 import {
   createReservation,
   listReservations,
+  updateReservationMetadata,
   updateReservationStatus,
 } from '../api/reservations.api';
 import type {
@@ -15,6 +16,7 @@ import type {
   AvailabilitySearchResponse,
   CreateReservationRequest,
   Reservation,
+  UpdateReservationMetadataRequest,
 } from '../types/booking.types';
 import type { ProblemDetail } from '../../../shared/api/problem-details';
 
@@ -70,3 +72,15 @@ export function useUpdateReservationStatusMutation() {
       updateReservationStatus(reservationId, status),
   });
 }
+
+export function useUpdateReservationMetadataMutation() {
+  return useMutation<
+    Reservation,
+    AxiosError<ProblemDetail>,
+    { reservationId: string; payload: UpdateReservationMetadataRequest }
+  >({
+    mutationFn: ({ reservationId, payload }) =>
+      updateReservationMetadata(reservationId, payload),
+  });
+}
+

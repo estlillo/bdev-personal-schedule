@@ -2,6 +2,7 @@ package com.barbatosdev.bdevpersonalschedule.reservation.api;
 
 import com.barbatosdev.bdevpersonalschedule.reservation.api.dto.CreateReservationRequest;
 import com.barbatosdev.bdevpersonalschedule.reservation.api.dto.ReservationResponse;
+import com.barbatosdev.bdevpersonalschedule.reservation.api.dto.UpdateReservationMetadataRequest;
 import com.barbatosdev.bdevpersonalschedule.reservation.api.dto.UpdateReservationStatusRequest;
 import com.barbatosdev.bdevpersonalschedule.reservation.application.CreateReservationCommand;
 import com.barbatosdev.bdevpersonalschedule.reservation.application.ReservationService;
@@ -64,6 +65,14 @@ public class ReservationController {
         @Valid @RequestBody UpdateReservationStatusRequest request
     ) {
         return ReservationMapper.toResponse(service.updateStatus(id, request.status()));
+    }
+
+    @PatchMapping("/{id}")
+    public ReservationResponse patchMetadata(
+        @PathVariable UUID id,
+        @Valid @RequestBody UpdateReservationMetadataRequest request
+    ) {
+        return ReservationMapper.toResponse(service.updateMetadata(id, request.referenceCode(), request.description()));
     }
 }
 

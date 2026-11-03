@@ -8,6 +8,8 @@ import {
 import type { ProblemDetail } from '../../../shared/api/problem-details';
 import {
   useAllProfessionalsQuery,
+  useUpdateReservationMetadataMutation,
+  useUpdateReservationStatusMutation,
   useReservationsByRangeQuery,
 } from '../hooks/useBookingData';
 import type { Reservation } from '../types/booking.types';
@@ -88,6 +90,12 @@ function reservationTitle(reservation: Reservation): string {
 
 export function ReservationsCalendarPage() {
   const [weekAnchor, setWeekAnchor] = useState<string>(toDateInput(new Date().toISOString()));
+  const [professionalFilter, setProfessionalFilter] = useState<string>('all');
+  const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
+  const [editReferenceCode, setEditReferenceCode] = useState<string>('');
+  const [editDescription, setEditDescription] = useState<string>('');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSuccess, setEditSuccess] = useState<string | null>(null);
 
   const weekDateKeys = useMemo(() => buildWeekDateKeys(weekAnchor), [weekAnchor]);
   const weekFrom = weekDateKeys[0];
@@ -95,15 +103,26 @@ export function ReservationsCalendarPage() {
 
   const reservationsQuery = useReservationsByRangeQuery(weekFrom, weekTo);
   const professionalsQuery = useAllProfessionalsQuery();
+  const updateMetadataMutation = useUpdateReservationMetadataMutation();
+  const updateStatusMutation = useUpdateReservationStatusMutation();
 
   const reservations = useMemo(
     () => (reservationsQuery.data ?? []).filter((item) => item.status !== 'CANCELLED'),
     [reservationsQuery.data],
   );
 
+  const filteredReservations = useMemo(() => {
+    if (professionalFilter === 'all') {
+      return reservations;
+    }
+    return reservations.filter((reservation) =>
+      reservation.professionalIds.includes(professionalFilter),
+    );
+  }, [reservations, professionalFilter]);
+
   const reservationsByDate = useMemo(
-    () => groupReservationsByStartDate(reservations),
-    [reservations],
+    () => groupReservationsByStartDate(filteredReservations),
+    [filteredReservations],
   );
 
   const professionalNamesById = useMemo(() => {
@@ -118,6 +137,98 @@ export function ReservationsCalendarPage() {
     const nextDate = addDays(new Date(`${weekAnchor}T00:00:00`), deltaDays);
     setWeekAnchor(formatDateKey(nextDate));
   };
+
+  const openEditor = (reservation: Reservation) => {
+    setEditingReservation(reservation);
+    setEditReferenceCode(reservation.referenceCode ?? '');
+    setEditDescription(reservation.description ?? '');
+    setEditError(null);
+    setEditSuccess(null);
+  };
+
+  const closeEditor = () => {
+    setEditingReservation(null);
+    setEditReferenceCode('');
+    setEditDescription('');
+    setEditError(null);
+    setEditSuccess(null);
+  };
+
+  const refreshReservations = async () => {
+    await reservationsQuery.refetch();
+  };
+
+  const onSaveMetadata = async () => {
+    if (!editingReservation) {
+      return;
+    }
+
+    setEditError(null);
+    setEditSuccess(null);
+
+    const referenceCode = editReferenceCode.trim();
+    const description = editDescription.trim();
+    if (!referenceCode && !description) {
+      setEditError('Debes ingresar referencia o descripcion.');
+      return;
+    }
+
+    try {
+      const updated = await updateMetadataMutation.mutateAsync({
+        reservationId: editingReservation.id,
+        payload: {
+          referenceCode: referenceCode || undefined,
+          description: description || undefined,
+        },
+      });
+      setEditingReservation(updated);
+      setEditReferenceCode(updated.referenceCode ?? '');
+      setEditDescription(updated.description ?? '');
+      setEditSuccess('Reserva actualizada correctamente.');
+      await refreshReservations();
+    } catch (error) {
+      setEditError(errorToMessage(error));
+    }
+  };
+
+  const onChangeStatus = async (status: 'CONFIRMED' | 'CANCELLED') => {
+    if (!editingReservation) {
+      return;
+    }
+
+    setEditError(null);
+    setEditSuccess(null);
+
+    try {
+      const updated = await updateStatusMutation.mutateAsync({
+        reservationId: editingReservation.id,
+        status,
+      });
+      if (updated.status === 'CANCELLED') {
+        await refreshReservations();
+        closeEditor();
+        return;
+      }
+
+      setEditingReservation(updated);
+      setEditSuccess('Estado actualizado correctamente.');
+      await refreshReservations();
+    } catch (error) {
+      setEditError(errorToMessage(error));
+    }
+  };
+
+  const isEditingPending =
+    updateMetadataMutation.isPending || updateStatusMutation.isPending;
+
+  const editingProfessionalNames = useMemo(() => {
+    if (!editingReservation) {
+      return '';
+    }
+    return editingReservation.professionalIds
+      .map((id) => professionalNamesById.get(id) ?? `Profesional ${id.slice(0, 8)}`)
+      .join(', ');
+  }, [editingReservation, professionalNamesById]);
 
   return (
     <main className="page">
@@ -142,6 +253,21 @@ export function ReservationsCalendarPage() {
           <button type="button" onClick={() => onMoveWeek(7)}>
             Semana siguiente
           </button>
+          <label>
+            Filtrar por profesional
+            <select
+              value={professionalFilter}
+              onChange={(event) => setProfessionalFilter(event.target.value)}
+              disabled={professionalsQuery.isLoading || !!professionalsQuery.error}
+            >
+              <option value="all">Todos</option>
+              {(professionalsQuery.data ?? []).map((professional) => (
+                <option key={professional.id} value={professional.id}>
+                  {professional.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <p className="subtitle">
           Semana mostrada desde {weekFrom} hasta {weekTo}.
@@ -180,20 +306,26 @@ export function ReservationsCalendarPage() {
 
                           return (
                             <li key={reservation.id}>
-                              <article className="reservation-card">
-                                <p className="reservation-card-time">
-                                  {formatTime(reservation.startsAt)} - {formatTime(reservation.endsAt)}
-                                </p>
-                                <p className="reservation-card-title">
-                                  {reservationTitle(reservation)}
-                                </p>
-                                <p className="reservation-card-description">
-                                  {reservation.description?.trim() || 'Sin descripcion'}
-                                </p>
-                                <p className="reservation-card-professionals">
-                                  Profesionales: {professionalNames.join(', ')}
-                                </p>
-                              </article>
+                              <button
+                                type="button"
+                                className="reservation-card-button"
+                                onClick={() => openEditor(reservation)}
+                              >
+                                <article className="reservation-card">
+                                  <p className="reservation-card-time">
+                                    {formatTime(reservation.startsAt)} - {formatTime(reservation.endsAt)}
+                                  </p>
+                                  <p className="reservation-card-title">
+                                    {reservationTitle(reservation)}
+                                  </p>
+                                  <p className="reservation-card-description">
+                                    {reservation.description?.trim() || 'Sin descripcion'}
+                                  </p>
+                                  <p className="reservation-card-professionals">
+                                    Profesionales: {professionalNames.join(', ')}
+                                  </p>
+                                </article>
+                              </button>
                             </li>
                           );
                         })}
@@ -206,6 +338,68 @@ export function ReservationsCalendarPage() {
           </div>
         )}
       </section>
+
+      {editingReservation && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <section className="modal-card">
+            <h2>Editar reserva</h2>
+            <p className="subtitle">
+              {formatTime(editingReservation.startsAt)} - {formatTime(editingReservation.endsAt)} | Estado: {editingReservation.status}
+            </p>
+            <p className="subtitle">Profesionales: {editingProfessionalNames}</p>
+
+            <div className="grid">
+              <label>
+                Titulo (codigo referencia)
+                <input
+                  type="text"
+                  maxLength={100}
+                  value={editReferenceCode}
+                  onChange={(event) => setEditReferenceCode(event.target.value)}
+                />
+              </label>
+              <label>
+                Descripcion
+                <input
+                  type="text"
+                  maxLength={255}
+                  value={editDescription}
+                  onChange={(event) => setEditDescription(event.target.value)}
+                />
+              </label>
+            </div>
+
+            {editError && <p className="error">{editError}</p>}
+            {editSuccess && <p className="success">{editSuccess}</p>}
+
+            <div className="actions">
+              <button type="button" onClick={onSaveMetadata} disabled={isEditingPending}>
+                Guardar cambios
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeStatus('CONFIRMED')}
+                disabled={isEditingPending || editingReservation.status !== 'HOLD'}
+              >
+                Confirmar
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeStatus('CANCELLED')}
+                disabled={
+                  isEditingPending ||
+                  (editingReservation.status !== 'HOLD' && editingReservation.status !== 'CONFIRMED')
+                }
+              >
+                Cancelar reserva
+              </button>
+              <button type="button" onClick={closeEditor} disabled={isEditingPending}>
+                Cerrar
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

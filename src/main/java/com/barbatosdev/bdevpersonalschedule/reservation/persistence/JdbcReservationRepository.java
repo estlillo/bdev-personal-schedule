@@ -140,6 +140,28 @@ public class JdbcReservationRepository implements ReservationRepository {
         return findById(id).orElseThrow(() -> new NotFoundException("Reservation not found: " + id));
     }
 
+    @Override
+    public Reservation updateMetadata(UUID id, String referenceCode, String description, LocalDateTime updatedAt) {
+        int updatedRows = jdbcClient.sql("""
+                UPDATE reservation
+                SET reference_code = :referenceCode,
+                    description = :description,
+                    updated_at = :updatedAt
+                WHERE id = :id
+            """)
+            .param("id", id.toString())
+            .param("referenceCode", referenceCode)
+            .param("description", description)
+            .param("updatedAt", updatedAt.toString())
+            .update();
+
+        if (updatedRows == 0) {
+            throw new NotFoundException("Reservation not found: " + id);
+        }
+
+        return findById(id).orElseThrow(() -> new NotFoundException("Reservation not found: " + id));
+    }
+
     private List<Reservation> toReservations(List<ReservationRow> rows) {
         if (rows.isEmpty()) {
             return List.of();

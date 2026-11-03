@@ -111,6 +111,25 @@ public class ReservationService {
         return reservationRepository.updateStatus(reservationId, targetStatus, LocalDateTime.now(clock));
     }
 
+    @Transactional
+    public Reservation updateMetadata(UUID reservationId, String referenceCode, String description) {
+        reservationRepository.findById(reservationId)
+            .orElseThrow(() -> new NotFoundException("Reservation not found: " + reservationId));
+
+        String normalizedReferenceCode = normalizeNullableText(referenceCode);
+        String normalizedDescription = normalizeNullableText(description);
+        if (normalizedReferenceCode == null && normalizedDescription == null) {
+            throw new IllegalArgumentException("referenceCode or description must contain text");
+        }
+
+        return reservationRepository.updateMetadata(
+            reservationId,
+            normalizedReferenceCode,
+            normalizedDescription,
+            LocalDateTime.now(clock)
+        );
+    }
+
     private void validateBasicCommand(CreateReservationCommand command) {
         if (command.professionalIds() == null || command.professionalIds().isEmpty()) {
             throw new IllegalArgumentException("professionalIds must not be empty");

@@ -32,6 +32,11 @@ export type CreateReservationRequest = {
   description?: string;
 };
 
+export type UpdateReservationMetadataRequest = {
+  referenceCode?: string;
+  description?: string;
+};
+
 export type Reservation = {
   id: string;
   professionalIds: string[];

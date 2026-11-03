@@ -2,6 +2,7 @@ import { apiClient } from '../../../shared/api/client';
 import type {
   CreateReservationRequest,
   Reservation,
+  UpdateReservationMetadataRequest,
 } from '../types/booking.types';
 
 type ListReservationsParams = {
@@ -34,6 +35,14 @@ export async function listReservations(
   const response = await apiClient.get<Reservation[]>('/reservations', {
     params,
   });
+  return response.data;
+}
+
+export async function updateReservationMetadata(
+  reservationId: string,
+  payload: UpdateReservationMetadataRequest,
+): Promise<Reservation> {
+  const response = await apiClient.patch<Reservation>(`/reservations/${reservationId}`, payload);
   return response.data;
 }
 
