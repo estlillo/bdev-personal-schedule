@@ -6,16 +6,21 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
 
+import com.barbatosdev.bdevpersonalschedule.availability.domain.IntervalOperations;
 import com.barbatosdev.bdevpersonalschedule.professional.application.ProfessionalService;
 import com.barbatosdev.bdevpersonalschedule.professional.domain.Professional;
 import com.barbatosdev.bdevpersonalschedule.reservation.domain.Reservation;
 import com.barbatosdev.bdevpersonalschedule.reservation.domain.ReservationStatus;
 import com.barbatosdev.bdevpersonalschedule.reservation.persistence.ReservationRepository;
 import com.barbatosdev.bdevpersonalschedule.shared.error.InvalidStatusTransitionException;
+import com.barbatosdev.bdevpersonalschedule.shared.schedule.InstitutionalBlockRule;
 import com.barbatosdev.bdevpersonalschedule.shared.schedule.InstitutionalSchedulePolicy;
-import com.barbatosdev.bdevpersonalschedule.shared.schedule.InstitutionalScheduleProperties;
+import com.barbatosdev.bdevpersonalschedule.shared.schedule.InstitutionalScheduleConfig;
+import com.barbatosdev.bdevpersonalschedule.shared.schedule.InstitutionalScheduleService;
+import com.barbatosdev.bdevpersonalschedule.shared.schedule.InstitutionalRuleType;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -25,6 +30,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,7 +47,47 @@ class ReservationServiceTest {
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(Instant.parse("2026-10-12T18:00:00Z"), ZoneId.of("America/Santiago"));
-        InstitutionalSchedulePolicy schedulePolicy = new InstitutionalSchedulePolicy(new InstitutionalScheduleProperties());
+        InstitutionalScheduleService institutionalScheduleService = Mockito.mock(InstitutionalScheduleService.class);
+        Mockito.lenient().when(institutionalScheduleService.getScheduleConfig()).thenReturn(new InstitutionalScheduleConfig(
+            LocalTime.parse("08:00"),
+            LocalTime.parse("17:00"),
+            45,
+            LocalDateTime.parse("2026-10-12T10:00:00")
+        ));
+        Mockito.lenient().when(institutionalScheduleService.listActiveBlockRules()).thenReturn(List.of(
+            new InstitutionalBlockRule(
+                UUID.randomUUID(),
+                "Pausa saludable",
+                "HEALTH_BREAK",
+                InstitutionalRuleType.WEEKLY,
+                1,
+                LocalTime.parse("10:15"),
+                LocalTime.parse("10:30"),
+                null,
+                null,
+                true,
+                LocalDateTime.parse("2026-10-12T10:00:00"),
+                LocalDateTime.parse("2026-10-12T10:00:00")
+            ),
+            new InstitutionalBlockRule(
+                UUID.randomUUID(),
+                "Hora de colacion",
+                "LUNCH",
+                InstitutionalRuleType.WEEKLY,
+                1,
+                LocalTime.parse("13:00"),
+                LocalTime.parse("14:00"),
+                null,
+                null,
+                true,
+                LocalDateTime.parse("2026-10-12T10:00:00"),
+                LocalDateTime.parse("2026-10-12T10:00:00")
+            )
+        ));
+        InstitutionalSchedulePolicy schedulePolicy = new InstitutionalSchedulePolicy(
+            institutionalScheduleService,
+            new IntervalOperations()
+        );
         reservationService = new ReservationService(
             reservationRepository,
             professionalService,

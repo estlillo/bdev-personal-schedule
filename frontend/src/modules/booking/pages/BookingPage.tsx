@@ -1,5 +1,5 @@
 import { AxiosError } from 'axios';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -14,6 +14,7 @@ import {
   useCreateReservationMutation,
   useUpdateReservationStatusMutation,
 } from '../hooks/useBookingData';
+import { useInstitutionalScheduleQuery } from '../../institutional/hooks/useInstitutionalData';
 import type {
   AvailabilitySlot,
   BatchReservationResponse,
@@ -117,6 +118,7 @@ function groupSlotsByDate(slots: AvailabilitySlot[]): SlotsByDate {
 
 export function BookingPage() {
   const professionalsQuery = useActiveProfessionalsQuery();
+  const institutionalScheduleQuery = useInstitutionalScheduleQuery();
   const availabilityMutation = useAvailabilitySearchMutation();
   const createReservationMutation = useCreateReservationMutation();
   const createBatchReservationMutation = useCreateBatchReservationMutation();
@@ -143,6 +145,14 @@ export function BookingPage() {
   const [batchRecurrenceIntervalWeeks, setBatchRecurrenceIntervalWeeks] = useState<number>(1);
   const [batchRecurrenceDaysOfWeek, setBatchRecurrenceDaysOfWeek] = useState<number[]>([1]);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!institutionalScheduleQuery.data) {
+      return;
+    }
+    setDurationMinutes(institutionalScheduleQuery.data.slotMinutes);
+    setStepMinutes(institutionalScheduleQuery.data.slotMinutes);
+  }, [institutionalScheduleQuery.data]);
 
   const slots = availabilityMutation.data?.slots ?? [];
   const groupedSlots = groupSlotsByDate(slots);
@@ -338,12 +348,13 @@ export function BookingPage() {
         <h1>Reserva de horas</h1>
         <div className="actions">
           <Link to="/calendar">Calendario general</Link>
+          <Link to="/institutional-schedule">Configuracion institucional</Link>
           <Link to="/professionals">Gestionar profesionales</Link>
           <Link to="/availability">Definir disponibilidad</Link>
         </div>
       </div>
       <p className="subtitle">
-        Busca disponibilidad con malla institucional fija (45 min), selecciona un bloque y crea una reserva.
+        Busca disponibilidad con malla institucional configurable, selecciona un bloque y crea una reserva.
       </p>
 
       <section className="card">
@@ -396,7 +407,9 @@ export function BookingPage() {
               </label>
             </div>
             <p className="subtitle">
-              Jornada institucional: 08:00-17:00, pausa 10:15-10:30, colacion 13:00-14:00.
+              {institutionalScheduleQuery.data
+                ? `Horario institucional activo: ${institutionalScheduleQuery.data.dayStart.slice(0, 5)}-${institutionalScheduleQuery.data.dayEnd.slice(0, 5)} | Sesion ${institutionalScheduleQuery.data.slotMinutes} min.`
+                : 'Cargando horario institucional...'}
             </p>
 
             <fieldset>

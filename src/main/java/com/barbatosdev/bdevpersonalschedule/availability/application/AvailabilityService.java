@@ -220,11 +220,6 @@ public class AvailabilityService {
         return slots;
     }
 
-    private List<TimeInterval> mergeLists(List<TimeInterval> first, List<TimeInterval> second) {
-        List<TimeInterval> merged = new ArrayList<>(first);
-        merged.addAll(second);
-        return merged;
-    }
 
     private LocalDateTime min(LocalDateTime a, LocalDateTime b) {
         return a.isBefore(b) ? a : b;

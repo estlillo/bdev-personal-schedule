@@ -12,12 +12,6 @@ public class InstitutionalScheduleProperties {
     private LocalTime dayEnd = LocalTime.parse("17:00");
     private int slotMinutes = 45;
 
-    private LocalTime healthyBreakStart = LocalTime.parse("10:15");
-    private LocalTime healthyBreakEnd = LocalTime.parse("10:30");
-
-    private LocalTime lunchBreakStart = LocalTime.parse("13:00");
-    private LocalTime lunchBreakEnd = LocalTime.parse("14:00");
-
     public LocalTime getDayStart() {
         return dayStart;
     }
@@ -40,38 +34,6 @@ public class InstitutionalScheduleProperties {
 
     public void setSlotMinutes(int slotMinutes) {
         this.slotMinutes = slotMinutes;
-    }
-
-    public LocalTime getHealthyBreakStart() {
-        return healthyBreakStart;
-    }
-
-    public void setHealthyBreakStart(LocalTime healthyBreakStart) {
-        this.healthyBreakStart = healthyBreakStart;
-    }
-
-    public LocalTime getHealthyBreakEnd() {
-        return healthyBreakEnd;
-    }
-
-    public void setHealthyBreakEnd(LocalTime healthyBreakEnd) {
-        this.healthyBreakEnd = healthyBreakEnd;
-    }
-
-    public LocalTime getLunchBreakStart() {
-        return lunchBreakStart;
-    }
-
-    public void setLunchBreakStart(LocalTime lunchBreakStart) {
-        this.lunchBreakStart = lunchBreakStart;
-    }
-
-    public LocalTime getLunchBreakEnd() {
-        return lunchBreakEnd;
-    }
-
-    public void setLunchBreakEnd(LocalTime lunchBreakEnd) {
-        this.lunchBreakEnd = lunchBreakEnd;
     }
 }
 

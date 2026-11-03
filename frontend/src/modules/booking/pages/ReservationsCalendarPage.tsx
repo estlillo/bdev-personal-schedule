@@ -236,6 +236,7 @@ export function ReservationsCalendarPage() {
         <h1>Calendario general de reservas</h1>
         <div className="actions">
           <Link to="/booking">Ir a reservas</Link>
+          <Link to="/institutional-schedule">Configuracion institucional</Link>
           <Link to="/availability">Definir disponibilidad</Link>
           <Link to="/professionals">Gestionar profesionales</Link>
         </div>

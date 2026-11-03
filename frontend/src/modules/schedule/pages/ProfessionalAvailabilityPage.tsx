@@ -307,6 +307,7 @@ export function ProfessionalAvailabilityPage() {
         <div className="actions">
           <Link to="/booking">Volver a reservas</Link>
           <Link to="/calendar">Calendario general</Link>
+          <Link to="/institutional-schedule">Configuracion institucional</Link>
           <Link to="/professionals">Gestionar profesionales</Link>
         </div>
       </div>
