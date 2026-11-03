@@ -64,7 +64,8 @@ class ReservationServiceTest {
             List.of(professionalId),
             LocalDateTime.parse("2026-10-19T08:00:00"),
             LocalDateTime.parse("2026-10-19T08:45:00"),
-            "CASO-001"
+            "CASO-001",
+            "Sesion inicial"
         ))).hasMessageContaining("outside effective working hours");
     }
 
@@ -104,6 +105,7 @@ class ReservationServiceTest {
             LocalDateTime.parse("2026-10-19T08:45:00"),
             status,
             "CASO-001",
+            "Descripcion",
             now,
             now,
             List.of(UUID.randomUUID())

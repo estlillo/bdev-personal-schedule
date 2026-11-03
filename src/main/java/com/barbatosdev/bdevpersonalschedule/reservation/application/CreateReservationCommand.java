@@ -8,7 +8,8 @@ public record CreateReservationCommand(
     List<UUID> professionalIds,
     LocalDateTime startsAt,
     LocalDateTime endsAt,
-    String referenceCode
+    String referenceCode,
+    String description
 ) {
 }
 

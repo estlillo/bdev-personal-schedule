@@ -149,6 +149,7 @@ export function ProfessionalsCrudPage() {
         <h1>Profesionales</h1>
         <div className="actions">
           <Link to="/booking">Ir a reservas</Link>
+          <Link to="/calendar">Calendario general</Link>
           <Link to="/availability">Definir disponibilidad</Link>
         </div>
       </div>

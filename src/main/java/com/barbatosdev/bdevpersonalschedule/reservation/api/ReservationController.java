@@ -51,7 +51,8 @@ public class ReservationController {
             request.professionalIds(),
             request.startsAt(),
             request.endsAt(),
-            request.referenceCode()
+            request.referenceCode(),
+            request.description()
         )));
 
         return ResponseEntity.created(URI.create("/api/v1/reservations/" + response.id())).body(response);

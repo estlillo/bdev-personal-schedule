@@ -36,7 +36,8 @@ Accept: application/json
   "professionalIds": ["{{profA}}"],
   "startsAt": "2026-10-20T11:00:00",
   "endsAt": "2026-10-20T11:45:00",
-  "referenceCode": "DEMO-OK-001"
+  "referenceCode": "DEMO-OK-001",
+  "description": "Primera sesion de evaluacion"
 }
 
 > {%
@@ -61,7 +62,8 @@ Accept: application/json
   "professionalIds": ["{{profA}}"],
   "startsAt": "2026-10-19T09:15:00",
   "endsAt": "2026-10-19T09:45:00",
-  "referenceCode": "DEMO-CONFLICT-001"
+  "referenceCode": "DEMO-CONFLICT-001",
+  "description": "Solicitud que deberia entrar en conflicto"
 }
 
 ### 7) Outside working hours (expected 422 OUTSIDE_WORKING_HOURS)
@@ -73,7 +75,8 @@ Accept: application/json
   "professionalIds": ["{{profA}}"],
   "startsAt": "2026-10-19T22:00:00",
   "endsAt": "2026-10-19T22:45:00",
-  "referenceCode": "DEMO-OOH-001"
+  "referenceCode": "DEMO-OOH-001",
+  "description": "Fuera de horario laboral"
 }
 
 ### 8) Reservations by range

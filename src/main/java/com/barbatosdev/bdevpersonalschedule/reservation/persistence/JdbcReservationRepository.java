@@ -40,7 +40,7 @@ public class JdbcReservationRepository implements ReservationRepository {
         List<ReservationRow> rows;
         if (status == null) {
             rows = jdbcClient.sql("""
-                    SELECT id, starts_at, ends_at, status, reference_code, created_at, updated_at
+                    SELECT id, starts_at, ends_at, status, reference_code, description, created_at, updated_at
                     FROM reservation
                     WHERE starts_at < :toExclusive
                       AND ends_at > :fromInclusive
@@ -52,7 +52,7 @@ public class JdbcReservationRepository implements ReservationRepository {
                 .list();
         } else {
             rows = jdbcClient.sql("""
-                    SELECT id, starts_at, ends_at, status, reference_code, created_at, updated_at
+                    SELECT id, starts_at, ends_at, status, reference_code, description, created_at, updated_at
                     FROM reservation
                     WHERE starts_at < :toExclusive
                       AND ends_at > :fromInclusive
@@ -72,7 +72,7 @@ public class JdbcReservationRepository implements ReservationRepository {
     @Override
     public Optional<Reservation> findById(UUID id) {
         Optional<ReservationRow> row = jdbcClient.sql("""
-                SELECT id, starts_at, ends_at, status, reference_code, created_at, updated_at
+                SELECT id, starts_at, ends_at, status, reference_code, description, created_at, updated_at
                 FROM reservation
                 WHERE id = :id
             """)
@@ -187,6 +187,7 @@ public class JdbcReservationRepository implements ReservationRepository {
             row.endsAt(),
             row.status(),
             row.referenceCode(),
+            row.description(),
             row.createdAt(),
             row.updatedAt(),
             professionalIds
@@ -200,6 +201,7 @@ public class JdbcReservationRepository implements ReservationRepository {
             LocalDateTime.parse(rs.getString("ends_at")),
             ReservationStatus.valueOf(rs.getString("status")),
             rs.getString("reference_code"),
+            rs.getString("description"),
             LocalDateTime.parse(rs.getString("created_at")),
             LocalDateTime.parse(rs.getString("updated_at"))
         );
@@ -271,16 +273,17 @@ public class JdbcReservationRepository implements ReservationRepository {
 
     private void insertReservation(Connection connection, Reservation reservation) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
-                INSERT INTO reservation (id, starts_at, ends_at, status, reference_code, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO reservation (id, starts_at, ends_at, status, reference_code, description, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """)) {
             statement.setString(1, reservation.id().toString());
             statement.setString(2, reservation.startsAt().toString());
             statement.setString(3, reservation.endsAt().toString());
             statement.setString(4, reservation.status().name());
             statement.setString(5, reservation.referenceCode());
-            statement.setString(6, reservation.createdAt().toString());
-            statement.setString(7, reservation.updatedAt().toString());
+            statement.setString(6, reservation.description());
+            statement.setString(7, reservation.createdAt().toString());
+            statement.setString(8, reservation.updatedAt().toString());
             statement.executeUpdate();
         }
     }
@@ -310,6 +313,7 @@ public class JdbcReservationRepository implements ReservationRepository {
         LocalDateTime endsAt,
         ReservationStatus status,
         String referenceCode,
+        String description,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
     ) {

@@ -16,6 +16,7 @@ public final class ReservationMapper {
             reservation.endsAt(),
             reservation.status().name(),
             reservation.referenceCode(),
+            reservation.description(),
             reservation.createdAt(),
             reservation.updatedAt()
         );

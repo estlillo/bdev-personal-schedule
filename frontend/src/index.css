@@ -173,6 +173,29 @@ button:disabled {
   background: #dbeafe;
 }
 
+.reservation-card {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #eef2ff;
+  padding: 0.55rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.reservation-card-time {
+  margin: 0;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.reservation-card-title,
+.reservation-card-description,
+.reservation-card-professionals {
+  margin: 0;
+  color: #111827;
+  font-size: 0.9rem;
+}
+
 .warning {
   color: #854d0e;
   background: #fef9c3;
@@ -208,6 +231,7 @@ button:disabled {
 .actions {
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .table-like {

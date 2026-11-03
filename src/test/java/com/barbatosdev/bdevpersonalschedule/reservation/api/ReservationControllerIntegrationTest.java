@@ -89,11 +89,13 @@ class ReservationControllerIntegrationTest {
                       "professionalIds":["%s"],
                       "startsAt":"2026-10-19T08:00:00",
                       "endsAt":"2026-10-19T08:45:00",
-                      "referenceCode":"CASO-001"
+                      "referenceCode":"CASO-001",
+                      "description":"Sesion de movilidad"
                     }
                     """.formatted(professionalId)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.status").value("HOLD"))
+            .andExpect(jsonPath("$.description").value("Sesion de movilidad"))
             .andReturn();
 
         String reservationId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asText();
@@ -124,7 +126,8 @@ class ReservationControllerIntegrationTest {
                       "professionalIds":["%s"],
                       "startsAt":"2026-10-19T09:00:00",
                       "endsAt":"2026-10-19T09:45:00",
-                      "referenceCode":"CASO-001"
+                      "referenceCode":"CASO-001",
+                      "description":"Bloque base"
                     }
                     """.formatted(professionalId)))
             .andExpect(status().isCreated());
@@ -136,7 +139,8 @@ class ReservationControllerIntegrationTest {
                       "professionalIds":["%s"],
                       "startsAt":"2026-10-19T09:30:00",
                       "endsAt":"2026-10-19T10:00:00",
-                      "referenceCode":"CASO-002"
+                      "referenceCode":"CASO-002",
+                      "description":"Bloque en conflicto"
                     }
                     """.formatted(professionalId)))
             .andExpect(status().isConflict())
@@ -155,7 +159,8 @@ class ReservationControllerIntegrationTest {
                       "professionalIds":["%s"],
                       "startsAt":"2026-10-19T14:00:00",
                       "endsAt":"2026-10-19T14:30:00",
-                      "referenceCode":"CASO-003"
+                      "referenceCode":"CASO-003",
+                      "description":"Fuera de horario"
                     }
                     """.formatted(professionalId)))
             .andExpect(status().isUnprocessableEntity())
@@ -228,7 +233,8 @@ class ReservationControllerIntegrationTest {
                       "professionalIds":["%s"],
                       "startsAt":"%s",
                       "endsAt":"%s",
-                      "referenceCode":"CASO-X"
+                      "referenceCode":"CASO-X",
+                      "description":"Reserva de prueba"
                     }
                     """.formatted(professionalId, startsAt, endsAt)))
             .andExpect(status().isCreated())

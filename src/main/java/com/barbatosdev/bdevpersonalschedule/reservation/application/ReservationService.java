@@ -81,6 +81,7 @@ public class ReservationService {
             command.endsAt(),
             ReservationStatus.HOLD,
             normalizeNullableText(command.referenceCode()),
+            normalizeNullableText(command.description()),
             now,
             now,
             professionalIds

@@ -29,6 +29,7 @@ export type CreateReservationRequest = {
   startsAt: string;
   endsAt: string;
   referenceCode?: string;
+  description?: string;
 };
 
 export type Reservation = {
@@ -38,6 +39,7 @@ export type Reservation = {
   endsAt: string;
   status: 'HOLD' | 'CONFIRMED' | 'CANCELLED';
   referenceCode: string | null;
+  description: string | null;
   createdAt: string;
   updatedAt: string;
 };

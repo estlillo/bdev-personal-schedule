@@ -10,6 +10,7 @@ public record Reservation(
     LocalDateTime endsAt,
     ReservationStatus status,
     String referenceCode,
+    String description,
     LocalDateTime createdAt,
     LocalDateTime updatedAt,
     List<UUID> professionalIds

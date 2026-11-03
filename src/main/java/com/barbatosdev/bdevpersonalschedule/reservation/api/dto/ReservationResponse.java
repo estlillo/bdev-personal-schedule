@@ -11,6 +11,7 @@ public record ReservationResponse(
     LocalDateTime endsAt,
     String status,
     String referenceCode,
+    String description,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {

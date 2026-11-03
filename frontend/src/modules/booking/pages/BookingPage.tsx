@@ -100,6 +100,7 @@ export function BookingPage() {
   const [stepMinutes, setStepMinutes] = useState<number>(15);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [referenceCode, setReferenceCode] = useState<string>('DEMO-UI-001');
+  const [description, setDescription] = useState<string>('');
   const [reservation, setReservation] = useState<Reservation | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -180,6 +181,7 @@ export function BookingPage() {
         startsAt: selectedSlot.startsAt,
         endsAt: selectedSlot.endsAt,
         referenceCode,
+        description,
       });
       setReservation(created);
     } catch (error) {
@@ -209,6 +211,7 @@ export function BookingPage() {
       <div className="page-header">
         <h1>Reserva de horas</h1>
         <div className="actions">
+          <Link to="/calendar">Calendario general</Link>
           <Link to="/professionals">Gestionar profesionales</Link>
           <Link to="/availability">Definir disponibilidad</Link>
         </div>
@@ -353,6 +356,15 @@ export function BookingPage() {
             onChange={(event) => setReferenceCode(event.target.value)}
           />
         </label>
+        <label>
+          Descripcion breve
+          <input
+            type="text"
+            maxLength={255}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+        </label>
         <button
           type="button"
           disabled={createReservationMutation.isPending || !selectedSlot}
@@ -369,6 +381,7 @@ export function BookingPage() {
             <p>
               {reservation.startsAt} - {reservation.endsAt}
             </p>
+            <p>Descripcion: {reservation.description ?? 'Sin descripcion'}</p>
             <p>Estado: {reservation.status}</p>
             <div className="actions">
               <button

@@ -133,7 +133,7 @@ export function ProfessionalAvailabilityPage() {
 
   useEffect(() => {
     if (!workingWindowsQuery.data) {
-      setWindowsDraft([]);
+                                           setWindowsDraft([]);
       return;
     }
 
@@ -306,6 +306,7 @@ export function ProfessionalAvailabilityPage() {
         <h1>Disponibilidad por profesional</h1>
         <div className="actions">
           <Link to="/booking">Volver a reservas</Link>
+          <Link to="/calendar">Calendario general</Link>
           <Link to="/professionals">Gestionar profesionales</Link>
         </div>
       </div>

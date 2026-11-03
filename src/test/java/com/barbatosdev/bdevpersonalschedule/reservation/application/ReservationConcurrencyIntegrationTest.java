@@ -98,7 +98,8 @@ class ReservationConcurrencyIntegrationTest {
             List.of(professional.id()),
             LocalDateTime.parse("2026-10-19T10:00:00"),
             LocalDateTime.parse("2026-10-19T10:45:00"),
-            "CASO-CONC"
+            "CASO-CONC",
+            "Reserva concurrente"
         );
 
         CountDownLatch latch = new CountDownLatch(1);

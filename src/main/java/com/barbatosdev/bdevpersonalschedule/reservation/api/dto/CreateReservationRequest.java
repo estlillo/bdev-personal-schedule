@@ -11,7 +11,8 @@ public record CreateReservationRequest(
     @NotEmpty List<@NotNull UUID> professionalIds,
     @NotNull LocalDateTime startsAt,
     @NotNull LocalDateTime endsAt,
-    @Size(max = 100) String referenceCode
+    @Size(max = 100) String referenceCode,
+    @Size(max = 255) String description
 ) {
 }
 

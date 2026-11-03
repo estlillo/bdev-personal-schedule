@@ -4,6 +4,12 @@ import type {
   Reservation,
 } from '../types/booking.types';
 
+type ListReservationsParams = {
+  from: string;
+  to: string;
+  status?: 'HOLD' | 'CONFIRMED' | 'CANCELLED';
+};
+
 export async function createReservation(
   payload: CreateReservationRequest,
 ): Promise<Reservation> {
@@ -21,3 +27,13 @@ export async function updateReservationStatus(
   );
   return response.data;
 }
+
+export async function listReservations(
+  params: ListReservationsParams,
+): Promise<Reservation[]> {
+  const response = await apiClient.get<Reservation[]>('/reservations', {
+    params,
+  });
+  return response.data;
+}
+

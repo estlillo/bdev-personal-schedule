@@ -42,6 +42,7 @@
 - ends_at DATETIME NOT NULL
 - status TEXT NOT NULL (HOLD, CONFIRMED, CANCELLED)
 - reference_code TEXT NULL (opaque, non-identifying)
+- description TEXT NULL (short non-identifying note)
 - created_at, updated_at DATETIME NOT NULL
 - CHECK starts_at < ends_at
 

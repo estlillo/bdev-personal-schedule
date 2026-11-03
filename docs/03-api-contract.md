@@ -44,6 +44,7 @@ The example UUID placeholders are illustrative only; actual requests must use va
 ```json
 {"professionalIds":["uuid-1","uuid-2"],"startsAt":"2026-10-19T08:00:00","endsAt":"2026-10-19T08:45:00","referenceCode":"CASO-001"}
 ```
+- Optional `description` (short free text, non-identifying) may be included in create payload and response.
 -> 201 with status HOLD; 409 on conflict.
 - `PATCH /reservations/{id}/status` body `{ "status":"CONFIRMED" }` -> 200. Allowed: HOLD->CONFIRMED, HOLD->CANCELLED, CONFIRMED->CANCELLED. No transition out of CANCELLED.
 - `DELETE /reservations/{id}` is not exposed; use CANCELLED for auditability.
