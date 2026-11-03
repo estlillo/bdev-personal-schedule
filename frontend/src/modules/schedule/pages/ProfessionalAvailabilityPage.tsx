@@ -194,6 +194,22 @@ export function ProfessionalAvailabilityPage() {
     setSuccessMessage('Plantilla Lun-Vie aplicada. Recuerda guardar cambios.');
   };
 
+  const onApplyQuickPreset = (startTime: string, endTime: string, label: string) => {
+    setPresetStartTime(startTime);
+    setPresetEndTime(endTime);
+    setFormError(null);
+    setSuccessMessage(null);
+
+    setWindowsDraft([
+      { dayOfWeek: 1, startTime, endTime },
+      { dayOfWeek: 2, startTime, endTime },
+      { dayOfWeek: 3, startTime, endTime },
+      { dayOfWeek: 4, startTime, endTime },
+      { dayOfWeek: 5, startTime, endTime },
+    ]);
+    setSuccessMessage(`Plantilla ${label} aplicada. Recuerda guardar cambios.`);
+  };
+
   const onSaveWindows = async () => {
     setFormError(null);
     setSuccessMessage(null);
@@ -288,7 +304,10 @@ export function ProfessionalAvailabilityPage() {
     <main className="page">
       <div className="page-header">
         <h1>Disponibilidad por profesional</h1>
-        <Link to="/booking">Volver a reservas</Link>
+        <div className="actions">
+          <Link to="/booking">Volver a reservas</Link>
+          <Link to="/professionals">Gestionar profesionales</Link>
+        </div>
       </div>
       <p className="subtitle">
         Define horarios semanales y excepciones de agenda para un profesional.
@@ -337,6 +356,20 @@ export function ProfessionalAvailabilityPage() {
               onChange={(event) => setPresetEndTime(event.target.value)}
             />
           </label>
+        </div>
+        <div className="actions">
+          <button
+            type="button"
+            onClick={() => onApplyQuickPreset('08:00', '17:00', 'Lun-Vie 08:00-17:00')}
+          >
+            Rapida Lun-Vie 08:00-17:00
+          </button>
+          <button
+            type="button"
+            onClick={() => onApplyQuickPreset('09:00', '18:00', 'Lun-Vie 09:00-18:00')}
+          >
+            Rapida Lun-Vie 09:00-18:00
+          </button>
         </div>
         <button type="button" onClick={onApplyWeekPreset}>
           Aplicar Lun-Vie a todo el bloque

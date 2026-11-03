@@ -208,7 +208,10 @@ export function BookingPage() {
     <main className="page">
       <div className="page-header">
         <h1>Reserva de horas</h1>
-        <Link to="/availability">Definir disponibilidad</Link>
+        <div className="actions">
+          <Link to="/professionals">Gestionar profesionales</Link>
+          <Link to="/availability">Definir disponibilidad</Link>
+        </div>
       </div>
       <p className="subtitle">
         Busca disponibilidad, selecciona un bloque y crea una reserva.

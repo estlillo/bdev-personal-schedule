@@ -35,10 +35,19 @@ npm run build
 - Permite definir horario semanal (`working windows`).
 - Permite consultar, crear y eliminar excepciones (`BLOCK`/`ADD`).
 
+## Pantalla de profesionales (CRUD simple)
+- Ruta: `/professionals`
+- Permite crear profesionales.
+- Permite editar nombre/especialidad.
+- Permite activar o desactivar profesionales.
+
 ## Archivos clave
 - `src/modules/booking/pages/BookingPage.tsx`
 - `src/modules/booking/hooks/useBookingData.ts`
 - `src/modules/booking/api/*.ts`
+- `src/modules/professionals/pages/ProfessionalsCrudPage.tsx`
+- `src/modules/professionals/hooks/useProfessionalsData.ts`
+- `src/modules/professionals/api/professionals.api.ts`
 - `src/modules/schedule/pages/ProfessionalAvailabilityPage.tsx`
 - `src/modules/schedule/hooks/useScheduleData.ts`
 - `src/modules/schedule/api/schedule.api.ts`
