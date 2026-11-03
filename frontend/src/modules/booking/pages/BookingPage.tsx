@@ -9,13 +9,30 @@ import {
 import type { ProblemDetail } from '../../../shared/api/problem-details';
 import {
   useActiveProfessionalsQuery,
+  useCreateBatchReservationMutation,
   useAvailabilitySearchMutation,
   useCreateReservationMutation,
   useUpdateReservationStatusMutation,
 } from '../hooks/useBookingData';
-import type { AvailabilitySlot, Reservation } from '../types/booking.types';
+import type {
+  AvailabilitySlot,
+  BatchReservationResponse,
+  Reservation,
+} from '../types/booking.types';
 
 type SlotsByDate = Record<string, AvailabilitySlot[]>;
+type CreateMode = 'single' | 'batch';
+type BatchStrategy = 'dates' | 'recurrence';
+
+const WEEK_DAYS: Array<{ value: number; label: string }> = [
+  { value: 1, label: 'Lun' },
+  { value: 2, label: 'Mar' },
+  { value: 3, label: 'Mie' },
+  { value: 4, label: 'Jue' },
+  { value: 5, label: 'Vie' },
+  { value: 6, label: 'Sab' },
+  { value: 7, label: 'Dom' },
+];
 
 function errorToMessage(error: unknown): string {
   if (!error) {
@@ -46,6 +63,18 @@ function formatDateLabel(dateKey: string): string {
 
 function formatSlotTime(slotDateTime: string): string {
   return slotDateTime.slice(11, 16);
+}
+
+function toLocalTimePart(slotDateTime: string): string {
+  return slotDateTime.slice(11, 19);
+}
+
+function parseSessionDatesInput(value: string): string[] {
+  const parsed = value
+    .split(/[\s,;]+/)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+  return [...new Set(parsed)];
 }
 
 function addDays(date: Date, days: number): Date {
@@ -90,6 +119,7 @@ export function BookingPage() {
   const professionalsQuery = useActiveProfessionalsQuery();
   const availabilityMutation = useAvailabilitySearchMutation();
   const createReservationMutation = useCreateReservationMutation();
+  const createBatchReservationMutation = useCreateBatchReservationMutation();
   const updateReservationStatusMutation = useUpdateReservationStatusMutation();
 
   const [selectedProfessionalIds, setSelectedProfessionalIds] = useState<string[]>([]);
@@ -97,11 +127,21 @@ export function BookingPage() {
   const [endDate, setEndDate] = useState<string>(toDateInput(new Date().toISOString()));
   const [searchedStartDate, setSearchedStartDate] = useState<string | null>(null);
   const [durationMinutes, setDurationMinutes] = useState<number>(45);
-  const [stepMinutes, setStepMinutes] = useState<number>(15);
+  const [stepMinutes, setStepMinutes] = useState<number>(45);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [referenceCode, setReferenceCode] = useState<string>('DEMO-UI-001');
   const [description, setDescription] = useState<string>('');
   const [reservation, setReservation] = useState<Reservation | null>(null);
+  const [batchResult, setBatchResult] = useState<BatchReservationResponse | null>(null);
+  const [createMode, setCreateMode] = useState<CreateMode>('single');
+  const [batchStrategy, setBatchStrategy] = useState<BatchStrategy>('dates');
+  const [batchSessionDatesInput, setBatchSessionDatesInput] = useState<string>('');
+  const [batchRecurrenceStartDate, setBatchRecurrenceStartDate] = useState<string>(
+    toDateInput(new Date().toISOString()),
+  );
+  const [batchRecurrenceOccurrences, setBatchRecurrenceOccurrences] = useState<number>(5);
+  const [batchRecurrenceIntervalWeeks, setBatchRecurrenceIntervalWeeks] = useState<number>(1);
+  const [batchRecurrenceDaysOfWeek, setBatchRecurrenceDaysOfWeek] = useState<number[]>([1]);
   const [formError, setFormError] = useState<string | null>(null);
 
   const slots = availabilityMutation.data?.slots ?? [];
@@ -147,6 +187,7 @@ export function BookingPage() {
     event.preventDefault();
     setFormError(null);
     setReservation(null);
+    setBatchResult(null);
     setSelectedSlot(null);
 
     if (!canSearch) {
@@ -170,6 +211,7 @@ export function BookingPage() {
 
   const onCreateReservation = async () => {
     setFormError(null);
+    setBatchResult(null);
     if (!selectedSlot) {
       setFormError('Selecciona un bloque antes de crear la reserva.');
       return;
@@ -184,6 +226,90 @@ export function BookingPage() {
         description,
       });
       setReservation(created);
+    } catch (error) {
+      setFormError(errorToMessage(error));
+    }
+  };
+
+  const onToggleBatchDay = (day: number, checked: boolean) => {
+    setBatchRecurrenceDaysOfWeek((current) => {
+      if (checked) {
+        return [...new Set([...current, day])].sort((a, b) => a - b);
+      }
+      return current.filter((item) => item !== day);
+    });
+  };
+
+  const onCreateBatchReservation = async () => {
+    setFormError(null);
+    setReservation(null);
+    setBatchResult(null);
+
+    if (!selectedSlot) {
+      setFormError('Selecciona un bloque antes de crear el lote.');
+      return;
+    }
+
+    if (selectedProfessionalIds.length === 0) {
+      setFormError('Selecciona al menos un profesional para el lote.');
+      return;
+    }
+
+    const referenceCodeTrimmed = referenceCode.trim();
+    const descriptionTrimmed = description.trim();
+
+    const payloadBase = {
+      professionalIds: selectedProfessionalIds,
+      startTime: toLocalTimePart(selectedSlot.startsAt),
+      endTime: toLocalTimePart(selectedSlot.endsAt),
+      referenceCode: referenceCodeTrimmed || undefined,
+      description: descriptionTrimmed || undefined,
+    };
+
+    try {
+      if (batchStrategy === 'dates') {
+        const sessionDates = parseSessionDatesInput(batchSessionDatesInput);
+        const allValid = sessionDates.every((item) => /^\d{4}-\d{2}-\d{2}$/.test(item));
+        if (sessionDates.length === 0 || !allValid) {
+          setFormError('Ingresa fechas validas en formato YYYY-MM-DD separadas por coma o salto de linea.');
+          return;
+        }
+
+        const result = await createBatchReservationMutation.mutateAsync({
+          ...payloadBase,
+          sessionDates,
+        });
+        setBatchResult(result);
+        return;
+      }
+
+      if (!batchRecurrenceStartDate) {
+        setFormError('Selecciona la fecha de inicio de la recurrencia.');
+        return;
+      }
+      if (batchRecurrenceOccurrences < 1) {
+        setFormError('La cantidad de sesiones debe ser mayor o igual a 1.');
+        return;
+      }
+      if (batchRecurrenceIntervalWeeks < 1) {
+        setFormError('El intervalo en semanas debe ser mayor o igual a 1.');
+        return;
+      }
+      if (batchRecurrenceDaysOfWeek.length === 0) {
+        setFormError('Selecciona al menos un dia de semana para la recurrencia.');
+        return;
+      }
+
+      const result = await createBatchReservationMutation.mutateAsync({
+        ...payloadBase,
+        recurrence: {
+          startDate: batchRecurrenceStartDate,
+          occurrences: batchRecurrenceOccurrences,
+          intervalWeeks: batchRecurrenceIntervalWeeks,
+          daysOfWeek: batchRecurrenceDaysOfWeek,
+        },
+      });
+      setBatchResult(result);
     } catch (error) {
       setFormError(errorToMessage(error));
     }
@@ -217,7 +343,7 @@ export function BookingPage() {
         </div>
       </div>
       <p className="subtitle">
-        Busca disponibilidad, selecciona un bloque y crea una reserva.
+        Busca disponibilidad con malla institucional fija (45 min), selecciona un bloque y crea una reserva.
       </p>
 
       <section className="card">
@@ -250,23 +376,28 @@ export function BookingPage() {
                 Duracion (minutos)
                 <input
                   type="number"
-                  min={15}
-                  step={15}
+                  min={45}
+                  step={45}
                   value={durationMinutes}
                   onChange={(event) => setDurationMinutes(Number(event.target.value))}
+                  disabled
                 />
               </label>
               <label>
                 Paso (minutos)
                 <input
                   type="number"
-                  min={5}
-                  step={5}
+                  min={45}
+                  step={45}
                   value={stepMinutes}
                   onChange={(event) => setStepMinutes(Number(event.target.value))}
+                  disabled
                 />
               </label>
             </div>
+            <p className="subtitle">
+              Jornada institucional: 08:00-17:00, pausa 10:15-10:30, colacion 13:00-14:00.
+            </p>
 
             <fieldset>
               <legend>Profesionales</legend>
@@ -348,6 +479,27 @@ export function BookingPage() {
 
       <section className="card">
         <h2>Crear reserva</h2>
+        <div className="actions">
+          <button
+            type="button"
+            className={createMode === 'single' ? 'slot selected' : 'slot'}
+            onClick={() => setCreateMode('single')}
+          >
+            Sesion unica
+          </button>
+          <button
+            type="button"
+            className={createMode === 'batch' ? 'slot selected' : 'slot'}
+            onClick={() => setCreateMode('batch')}
+          >
+            Lote de sesiones
+          </button>
+        </div>
+        {selectedSlot && (
+          <p className="subtitle">
+            Bloque base: {formatSlotTime(selectedSlot.startsAt)} - {formatSlotTime(selectedSlot.endsAt)}
+          </p>
+        )}
         <label>
           Codigo de referencia
           <input
@@ -365,13 +517,102 @@ export function BookingPage() {
             onChange={(event) => setDescription(event.target.value)}
           />
         </label>
-        <button
-          type="button"
-          disabled={createReservationMutation.isPending || !selectedSlot}
-          onClick={onCreateReservation}
-        >
-          {createReservationMutation.isPending ? 'Creando...' : 'Crear HOLD'}
-        </button>
+        {createMode === 'single' ? (
+          <button
+            type="button"
+            disabled={createReservationMutation.isPending || !selectedSlot}
+            onClick={onCreateReservation}
+          >
+            {createReservationMutation.isPending ? 'Creando...' : 'Crear HOLD'}
+          </button>
+        ) : (
+          <>
+            <label>
+              Estrategia
+              <select
+                value={batchStrategy}
+                onChange={(event) => setBatchStrategy(event.target.value as BatchStrategy)}
+              >
+                <option value="dates">Fechas explicitas</option>
+                <option value="recurrence">Recurrencia semanal</option>
+              </select>
+            </label>
+
+            {batchStrategy === 'dates' ? (
+              <label>
+                Fechas de sesion (YYYY-MM-DD)
+                <textarea
+                  rows={4}
+                  value={batchSessionDatesInput}
+                  onChange={(event) => setBatchSessionDatesInput(event.target.value)}
+                  placeholder="2026-10-19, 2026-10-26"
+                />
+              </label>
+            ) : (
+              <>
+                <div className="grid">
+                  <label>
+                    Fecha inicio
+                    <input
+                      type="date"
+                      value={batchRecurrenceStartDate}
+                      onChange={(event) => setBatchRecurrenceStartDate(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Cantidad de sesiones
+                    <input
+                      type="number"
+                      min={1}
+                      value={batchRecurrenceOccurrences}
+                      onChange={(event) =>
+                        setBatchRecurrenceOccurrences(Number(event.target.value))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Cada cuantas semanas
+                    <input
+                      type="number"
+                      min={1}
+                      value={batchRecurrenceIntervalWeeks}
+                      onChange={(event) =>
+                        setBatchRecurrenceIntervalWeeks(Number(event.target.value))
+                      }
+                    />
+                  </label>
+                </div>
+                <fieldset>
+                  <legend>Dias de semana</legend>
+                  <div className="professionals">
+                    {WEEK_DAYS.map((day) => (
+                      <label key={day.value}>
+                        <input
+                          type="checkbox"
+                          checked={batchRecurrenceDaysOfWeek.includes(day.value)}
+                          onChange={(event) =>
+                            onToggleBatchDay(day.value, event.target.checked)
+                          }
+                        />
+                        {day.label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              </>
+            )}
+
+            <button
+              type="button"
+              disabled={createBatchReservationMutation.isPending || !selectedSlot}
+              onClick={onCreateBatchReservation}
+            >
+              {createBatchReservationMutation.isPending
+                ? 'Creando lote...'
+                : 'Crear lote HOLD'}
+            </button>
+          </>
+        )}
 
         {reservation && (
           <div className="reservation-result">
@@ -406,6 +647,21 @@ export function BookingPage() {
                 Cancelar
               </button>
             </div>
+          </div>
+        )}
+        {batchResult && (
+          <div className="reservation-result">
+            <p>
+              Lote creado: <strong>{batchResult.createdSessions}</strong> de{' '}
+              <strong>{batchResult.requestedSessions}</strong> sesiones.
+            </p>
+            <ul className="slots">
+              {batchResult.reservations.map((item) => (
+                <li key={item.id}>
+                  {item.startsAt} - {item.endsAt} | {item.status} | {item.referenceCode ?? 'Sin codigo'}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </section>

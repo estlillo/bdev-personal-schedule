@@ -16,6 +16,8 @@ public interface ReservationRepository {
 
     Reservation createAtomic(Reservation reservation);
 
+    List<Reservation> createBatchAtomic(List<Reservation> reservations);
+
     Reservation updateStatus(UUID id, ReservationStatus status, LocalDateTime updatedAt);
 
     Reservation updateMetadata(UUID id, String referenceCode, String description, LocalDateTime updatedAt);

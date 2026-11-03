@@ -10,6 +10,8 @@ import com.barbatosdev.bdevpersonalschedule.availability.domain.IntervalOperatio
 import com.barbatosdev.bdevpersonalschedule.availability.persistence.AvailabilityQueryRepository;
 import com.barbatosdev.bdevpersonalschedule.professional.application.ProfessionalService;
 import com.barbatosdev.bdevpersonalschedule.professional.domain.Professional;
+import com.barbatosdev.bdevpersonalschedule.shared.schedule.InstitutionalSchedulePolicy;
+import com.barbatosdev.bdevpersonalschedule.shared.schedule.InstitutionalScheduleProperties;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -39,11 +41,18 @@ class AvailabilityServiceTest {
         AvailabilityLimitsProperties properties = new AvailabilityLimitsProperties();
         properties.setMaxProfessionals(7);
         properties.setMaxRangeDays(30);
-        properties.setDefaultStepMinutes(15);
+        properties.setDefaultStepMinutes(45);
         properties.setMaxReturnedSlots(500);
 
         Clock clock = Clock.fixed(Instant.parse("2026-10-12T18:00:00Z"), ZoneId.of("America/Santiago"));
-        service = new AvailabilityService(repository, professionalService, properties, new IntervalOperations(), clock);
+        service = new AvailabilityService(
+            repository,
+            professionalService,
+            properties,
+            new IntervalOperations(),
+            new InstitutionalSchedulePolicy(new InstitutionalScheduleProperties()),
+            clock
+        );
     }
 
     @Test
@@ -56,7 +65,7 @@ class AvailabilityServiceTest {
             LocalDate.parse("2026-10-19"),
             LocalDate.parse("2026-10-19"),
             45,
-            15
+            45
         );
 
         assertThatThrownBy(() -> service.search(command))
@@ -65,39 +74,15 @@ class AvailabilityServiceTest {
     }
 
     @Test
-    void searchShouldComposeWindowsExceptionsAndEvents() {
+    void searchShouldApplyInstitutionalSlotsAndEvents() {
         UUID professionalId = UUID.randomUUID();
         when(professionalService.getById(professionalId)).thenReturn(professional(professionalId, true));
 
-        when(repository.findWorkingWindows(anyList())).thenReturn(List.of(
-            new AvailabilityQueryRepository.WorkingWindowRow(
-                professionalId,
-                1,
-                java.time.LocalTime.parse("08:00"),
-                java.time.LocalTime.parse("12:00")
-            )
-        ));
-        when(repository.findExceptions(anyList(), any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of(
-            new AvailabilityQueryRepository.ScheduleExceptionRow(
-                professionalId,
-                LocalDate.parse("2026-10-19"),
-                java.time.LocalTime.parse("10:00"),
-                java.time.LocalTime.parse("11:00"),
-                "BLOCK"
-            ),
-            new AvailabilityQueryRepository.ScheduleExceptionRow(
-                professionalId,
-                LocalDate.parse("2026-10-19"),
-                java.time.LocalTime.parse("18:00"),
-                java.time.LocalTime.parse("19:00"),
-                "ADD"
-            )
-        ));
         when(repository.findCalendarEvents(anyList(), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of(
             new AvailabilityQueryRepository.CalendarEventRow(
                 professionalId,
-                LocalDateTime.parse("2026-10-19T08:30:00"),
-                LocalDateTime.parse("2026-10-19T09:00:00")
+                LocalDateTime.parse("2026-10-19T09:00:00"),
+                LocalDateTime.parse("2026-10-19T09:45:00")
             )
         ));
         when(repository.findActiveReservations(anyList(), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of());
@@ -106,15 +91,15 @@ class AvailabilityServiceTest {
             List.of(professionalId),
             LocalDate.parse("2026-10-19"),
             LocalDate.parse("2026-10-19"),
-            30,
-            15
+            45,
+            45
         ));
 
         assertThat(result.warning()).contains("registros locales");
         assertThat(result.slots())
             .extracting(slot -> slot.startsAt().toString())
-            .contains("2026-10-19T08:00", "2026-10-19T09:00", "2026-10-19T18:00")
-            .doesNotContain("2026-10-19T08:30");
+            .contains("2026-10-19T08:00", "2026-10-19T10:30", "2026-10-19T14:00")
+            .doesNotContain("2026-10-19T09:00", "2026-10-19T10:15", "2026-10-19T13:00");
     }
 
     @Test
@@ -125,21 +110,6 @@ class AvailabilityServiceTest {
         when(professionalService.getById(professionalA)).thenReturn(professional(professionalA, true));
         when(professionalService.getById(professionalB)).thenReturn(professional(professionalB, true));
 
-        when(repository.findWorkingWindows(anyList())).thenReturn(List.of(
-            new AvailabilityQueryRepository.WorkingWindowRow(
-                professionalA,
-                1,
-                java.time.LocalTime.parse("08:00"),
-                java.time.LocalTime.parse("12:00")
-            ),
-            new AvailabilityQueryRepository.WorkingWindowRow(
-                professionalB,
-                1,
-                java.time.LocalTime.parse("09:00"),
-                java.time.LocalTime.parse("11:00")
-            )
-        ));
-        when(repository.findExceptions(anyList(), any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of());
         when(repository.findCalendarEvents(anyList(), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of());
         when(repository.findActiveReservations(anyList(), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of());
 
@@ -147,13 +117,13 @@ class AvailabilityServiceTest {
             List.of(professionalA, professionalB),
             LocalDate.parse("2026-10-19"),
             LocalDate.parse("2026-10-19"),
-            60,
-            30
+            45,
+            45
         ));
 
         assertThat(result.slots())
             .extracting(slot -> slot.startsAt().toString())
-            .containsExactly("2026-10-19T09:00", "2026-10-19T09:30", "2026-10-19T10:00");
+            .contains("2026-10-19T08:00", "2026-10-19T08:45", "2026-10-19T09:30");
     }
 
     private Professional professional(UUID id, boolean active) {

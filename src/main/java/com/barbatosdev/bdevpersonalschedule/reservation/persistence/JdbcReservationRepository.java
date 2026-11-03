@@ -121,6 +121,45 @@ public class JdbcReservationRepository implements ReservationRepository {
     }
 
     @Override
+    public List<Reservation> createBatchAtomic(List<Reservation> reservations) {
+        if (reservations == null || reservations.isEmpty()) {
+            throw new IllegalArgumentException("reservations must not be empty");
+        }
+
+        try (Connection connection = dataSource.getConnection()) {
+            beginImmediate(connection);
+            try {
+                for (Reservation reservation : reservations) {
+                    for (UUID professionalId : reservation.professionalIds()) {
+                        if (hasCalendarEventConflict(connection, professionalId, reservation.startsAt(), reservation.endsAt())
+                            || hasActiveReservationConflict(connection, professionalId, reservation.startsAt(), reservation.endsAt())) {
+                            executeSql(connection, "ROLLBACK");
+                            throw new ScheduleConflictException("Reservation interval conflicts with existing schedule");
+                        }
+                    }
+
+                    insertReservation(connection, reservation);
+                    insertReservationProfessionals(connection, reservation);
+                }
+
+                executeSql(connection, "COMMIT");
+                return reservations;
+            } catch (RuntimeException ex) {
+                rollbackQuietly(connection);
+                throw ex;
+            } catch (SQLException ex) {
+                rollbackQuietly(connection);
+                throw new IllegalStateException("Failed to create reservation batch", ex);
+            }
+        } catch (SQLException ex) {
+            if (isDatabaseLocked(ex)) {
+                throw new ScheduleConflictException("Reservation interval conflicts with concurrent write operation");
+            }
+            throw new IllegalStateException("Failed to create reservation batch", ex);
+        }
+    }
+
+    @Override
     public Reservation updateStatus(UUID id, ReservationStatus status, LocalDateTime updatedAt) {
         int updatedRows = jdbcClient.sql("""
                 UPDATE reservation

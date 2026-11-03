@@ -1,9 +1,12 @@
 package com.barbatosdev.bdevpersonalschedule.reservation.api;
 
 import com.barbatosdev.bdevpersonalschedule.reservation.api.dto.CreateReservationRequest;
+import com.barbatosdev.bdevpersonalschedule.reservation.api.dto.BatchReservationResponse;
+import com.barbatosdev.bdevpersonalschedule.reservation.api.dto.CreateBatchReservationRequest;
 import com.barbatosdev.bdevpersonalschedule.reservation.api.dto.ReservationResponse;
 import com.barbatosdev.bdevpersonalschedule.reservation.api.dto.UpdateReservationMetadataRequest;
 import com.barbatosdev.bdevpersonalschedule.reservation.api.dto.UpdateReservationStatusRequest;
+import com.barbatosdev.bdevpersonalschedule.reservation.application.CreateBatchReservationCommand;
 import com.barbatosdev.bdevpersonalschedule.reservation.application.CreateReservationCommand;
 import com.barbatosdev.bdevpersonalschedule.reservation.application.ReservationService;
 import jakarta.validation.Valid;
@@ -57,6 +60,40 @@ public class ReservationController {
         )));
 
         return ResponseEntity.created(URI.create("/api/v1/reservations/" + response.id())).body(response);
+    }
+
+    @PostMapping("/batch")
+    public ResponseEntity<BatchReservationResponse> createBatch(@Valid @RequestBody CreateBatchReservationRequest request) {
+        CreateBatchReservationCommand.Recurrence recurrence = null;
+        if (request.recurrence() != null) {
+            recurrence = new CreateBatchReservationCommand.Recurrence(
+                request.recurrence().startDate(),
+                request.recurrence().occurrences(),
+                request.recurrence().intervalWeeks(),
+                request.recurrence().daysOfWeek()
+            );
+        }
+
+        List<ReservationResponse> reservations = service.createBatch(new CreateBatchReservationCommand(
+                request.professionalIds(),
+                request.startTime(),
+                request.endTime(),
+                request.referenceCode(),
+                request.description(),
+                request.sessionDates(),
+                recurrence
+            ))
+            .stream()
+            .map(ReservationMapper::toResponse)
+            .toList();
+
+        BatchReservationResponse response = new BatchReservationResponse(
+            reservations.size(),
+            reservations.size(),
+            reservations
+        );
+
+        return ResponseEntity.created(URI.create("/api/v1/reservations")).body(response);
     }
 
     @PatchMapping("/{id}/status")

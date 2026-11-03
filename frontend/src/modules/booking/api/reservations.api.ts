@@ -1,6 +1,8 @@
 import { apiClient } from '../../../shared/api/client';
 import type {
+  BatchReservationResponse,
   CreateReservationRequest,
+  CreateBatchReservationRequest,
   Reservation,
   UpdateReservationMetadataRequest,
 } from '../types/booking.types';
@@ -43,6 +45,16 @@ export async function updateReservationMetadata(
   payload: UpdateReservationMetadataRequest,
 ): Promise<Reservation> {
   const response = await apiClient.patch<Reservation>(`/reservations/${reservationId}`, payload);
+  return response.data;
+}
+
+export async function createBatchReservation(
+  payload: CreateBatchReservationRequest,
+): Promise<BatchReservationResponse> {
+  const response = await apiClient.post<BatchReservationResponse>(
+    '/reservations/batch',
+    payload,
+  );
   return response.data;
 }
 

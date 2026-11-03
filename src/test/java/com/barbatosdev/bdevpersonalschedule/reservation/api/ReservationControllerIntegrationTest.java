@@ -124,8 +124,8 @@ class ReservationControllerIntegrationTest {
                 .content("""
                     {
                       "professionalIds":["%s"],
-                      "startsAt":"2026-10-19T09:00:00",
-                      "endsAt":"2026-10-19T09:45:00",
+                      "startsAt":"2026-10-19T08:45:00",
+                      "endsAt":"2026-10-19T09:30:00",
                       "referenceCode":"CASO-001",
                       "description":"Bloque base"
                     }
@@ -137,8 +137,8 @@ class ReservationControllerIntegrationTest {
                 .content("""
                     {
                       "professionalIds":["%s"],
-                      "startsAt":"2026-10-19T09:30:00",
-                      "endsAt":"2026-10-19T10:00:00",
+                      "startsAt":"2026-10-19T08:45:00",
+                      "endsAt":"2026-10-19T09:30:00",
                       "referenceCode":"CASO-002",
                       "description":"Bloque en conflicto"
                     }
@@ -150,15 +150,15 @@ class ReservationControllerIntegrationTest {
     @Test
     void createShouldRejectOutsideWorkingHours() throws Exception {
         String professionalId = createProfessional("Profesional Horario");
-        configureMorningWindow(professionalId);
+        configureFullDayWindow(professionalId);
 
         mockMvc.perform(post("/api/v1/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
                       "professionalIds":["%s"],
-                      "startsAt":"2026-10-19T14:00:00",
-                      "endsAt":"2026-10-19T14:30:00",
+                      "startsAt":"2026-10-19T10:15:00",
+                      "endsAt":"2026-10-19T11:00:00",
                       "referenceCode":"CASO-003",
                       "description":"Fuera de horario"
                     }
@@ -172,7 +172,7 @@ class ReservationControllerIntegrationTest {
         String professionalId = createProfessional("Profesional Estado");
         configureFullDayWindow(professionalId);
 
-        String reservationId = createReservation(professionalId, "2026-10-19T11:00:00", "2026-10-19T11:45:00");
+        String reservationId = createReservation(professionalId, "2026-10-19T11:15:00", "2026-10-19T12:00:00");
 
         mockMvc.perform(patch("/api/v1/reservations/{id}/status", reservationId)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -190,7 +190,7 @@ class ReservationControllerIntegrationTest {
     void patchMetadataShouldUpdateReferenceCodeAndDescription() throws Exception {
         String professionalId = createProfessional("Profesional Edicion");
         configureFullDayWindow(professionalId);
-        String reservationId = createReservation(professionalId, "2026-10-19T10:00:00", "2026-10-19T10:45:00");
+        String reservationId = createReservation(professionalId, "2026-10-19T10:30:00", "2026-10-19T11:15:00");
 
         mockMvc.perform(patch("/api/v1/reservations/{id}", reservationId)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -203,6 +203,89 @@ class ReservationControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.referenceCode").value("CASO-EDITADO"))
             .andExpect(jsonPath("$.description").value("Descripcion actualizada"));
+    }
+
+    @Test
+    void createBatchShouldCreateAllSessions() throws Exception {
+        String professionalId = createProfessional("Profesional Lote");
+        configureFullDayWindow(professionalId);
+
+        mockMvc.perform(post("/api/v1/reservations/batch")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "professionalIds": ["%s"],
+                      "startTime": "08:45:00",
+                      "endTime": "09:30:00",
+                      "sessionDates": ["2026-10-19", "2026-10-26"],
+                      "referenceCode": "BATCH-001",
+                      "description": "Pack inicial"
+                    }
+                    """.formatted(professionalId)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.requestedSessions").value(2))
+            .andExpect(jsonPath("$.createdSessions").value(2))
+            .andExpect(jsonPath("$.reservations", hasSize(2)));
+    }
+
+    @Test
+    void createBatchShouldRollbackAllWhenAnySessionConflicts() throws Exception {
+        String professionalId = createProfessional("Profesional Lote Conflicto");
+        configureFullDayWindow(professionalId);
+
+        createReservation(professionalId, "2026-10-26T08:45:00", "2026-10-26T09:30:00");
+
+        mockMvc.perform(post("/api/v1/reservations/batch")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "professionalIds": ["%s"],
+                      "startTime": "08:45:00",
+                      "endTime": "09:30:00",
+                      "sessionDates": ["2026-10-19", "2026-10-26"],
+                      "referenceCode": "BATCH-002",
+                      "description": "Pack en conflicto"
+                    }
+                    """.formatted(professionalId)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("SCHEDULE_CONFLICT"));
+
+        Integer reservationCount = jdbcClient.sql("SELECT COUNT(1) FROM reservation").query(Integer.class).single();
+        Assertions.assertEquals(1, reservationCount);
+    }
+
+    @Test
+    void createBatchWithRecurrenceShouldRespectFridaySelection() throws Exception {
+        String professionalId = createProfessional("Profesional Viernes");
+        configureFridayWindow(professionalId);
+
+        MvcResult result = mockMvc.perform(post("/api/v1/reservations/batch")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "professionalIds": ["%s"],
+                      "startTime": "08:45:00",
+                      "endTime": "09:30:00",
+                      "referenceCode": "BATCH-FRI-001",
+                      "description": "Solo viernes",
+                      "recurrence": {
+                        "startDate": "2026-10-14",
+                        "occurrences": 5,
+                        "intervalWeeks": 1,
+                        "daysOfWeek": [5]
+                      }
+                    }
+                    """.formatted(professionalId)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.createdSessions").value(5))
+            .andReturn();
+
+        JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
+        for (JsonNode reservationNode : body.get("reservations")) {
+            String startsAt = reservationNode.get("startsAt").asText();
+            java.time.LocalDate date = java.time.LocalDate.parse(startsAt.substring(0, 10));
+            Assertions.assertEquals(5, date.getDayOfWeek().getValue());
+        }
     }
 
     private String createProfessional(String name) throws Exception {
@@ -238,6 +321,19 @@ class ReservationControllerIntegrationTest {
                     {
                       "windows": [
                         {"dayOfWeek":1,"startTime":"08:00","endTime":"17:00"}
+                      ]
+                    }
+                    """))
+            .andExpect(status().isOk());
+    }
+
+    private void configureFridayWindow(String professionalId) throws Exception {
+        mockMvc.perform(put("/api/v1/professionals/{id}/working-windows", professionalId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "windows": [
+                        {"dayOfWeek":5,"startTime":"08:00","endTime":"17:00"}
                       ]
                     }
                     """))

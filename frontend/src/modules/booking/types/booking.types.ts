@@ -32,6 +32,23 @@ export type CreateReservationRequest = {
   description?: string;
 };
 
+export type BatchRecurrenceRequest = {
+  startDate: string;
+  occurrences: number;
+  intervalWeeks: number;
+  daysOfWeek: number[];
+};
+
+export type CreateBatchReservationRequest = {
+  professionalIds: string[];
+  startTime: string;
+  endTime: string;
+  referenceCode?: string;
+  description?: string;
+  sessionDates?: string[];
+  recurrence?: BatchRecurrenceRequest;
+};
+
 export type UpdateReservationMetadataRequest = {
   referenceCode?: string;
   description?: string;
@@ -47,5 +64,11 @@ export type Reservation = {
   description: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type BatchReservationResponse = {
+  requestedSessions: number;
+  createdSessions: number;
+  reservations: Reservation[];
 };
 

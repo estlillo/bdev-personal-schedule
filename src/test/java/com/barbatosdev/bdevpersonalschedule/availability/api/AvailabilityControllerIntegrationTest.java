@@ -74,7 +74,7 @@ class AvailabilityControllerIntegrationTest {
     }
 
     @Test
-    void searchShouldReturnSlotsApplyingWindowsExceptionsAndEvents() throws Exception {
+    void searchShouldReturnInstitutionalSlotsApplyingEvents() throws Exception {
         String professionalId = createProfessional();
 
         mockMvc.perform(put("/api/v1/professionals/{id}/working-windows", professionalId)
@@ -94,8 +94,8 @@ class AvailabilityControllerIntegrationTest {
                 .content("""
                     {
                       "date":"2026-10-19",
-                      "startTime":"10:00",
-                      "endTime":"11:00",
+                      "startTime":"10:15",
+                      "endTime":"10:30",
                       "mode":"BLOCK"
                     }
                     """))
@@ -106,8 +106,8 @@ class AvailabilityControllerIntegrationTest {
                 .content("""
                     {
                       "date":"2026-10-19",
-                      "startTime":"18:00",
-                      "endTime":"19:00",
+                      "startTime":"14:00",
+                      "endTime":"14:45",
                       "mode":"ADD"
                     }
                     """))
@@ -118,8 +118,8 @@ class AvailabilityControllerIntegrationTest {
                 .content("""
                     {
                       "professionalId":"%s",
-                      "startsAt":"2026-10-19T08:30:00",
-                      "endsAt":"2026-10-19T09:00:00",
+                      "startsAt":"2026-10-19T09:00:00",
+                      "endsAt":"2026-10-19T09:45:00",
                       "category":"MEETING"
                     }
                     """.formatted(professionalId)))
@@ -132,15 +132,15 @@ class AvailabilityControllerIntegrationTest {
                       "professionalIds":["%s"],
                       "startDate":"2026-10-19",
                       "endDate":"2026-10-19",
-                      "durationMinutes":30,
-                      "stepMinutes":15
+                      "durationMinutes":45,
+                      "stepMinutes":45
                     }
                     """.formatted(professionalId)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.warning").value("Disponibilidad basada en registros locales; verificar agenda oficial"))
             .andExpect(jsonPath("$.slots", hasSize(org.hamcrest.Matchers.greaterThan(0))))
             .andExpect(jsonPath("$.slots[0].startsAt").value("2026-10-19T08:00:00"))
-            .andExpect(jsonPath("$.slots[?(@.startsAt == '2026-10-19T08:30:00')]", hasSize(0)));
+            .andExpect(jsonPath("$.slots[?(@.startsAt == '2026-10-19T09:00:00')]", hasSize(0)));
     }
 
     @Test
@@ -159,8 +159,8 @@ class AvailabilityControllerIntegrationTest {
                       "professionalIds":["%s"],
                       "startDate":"2026-10-19",
                       "endDate":"2026-10-19",
-                      "durationMinutes":30,
-                      "stepMinutes":15
+                      "durationMinutes":45,
+                      "stepMinutes":45
                     }
                     """.formatted(professionalId)))
             .andExpect(status().isBadRequest())

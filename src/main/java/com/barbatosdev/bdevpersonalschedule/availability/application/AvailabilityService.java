@@ -5,6 +5,7 @@ import com.barbatosdev.bdevpersonalschedule.availability.domain.TimeInterval;
 import com.barbatosdev.bdevpersonalschedule.availability.persistence.AvailabilityQueryRepository;
 import com.barbatosdev.bdevpersonalschedule.professional.application.ProfessionalService;
 import com.barbatosdev.bdevpersonalschedule.professional.domain.Professional;
+import com.barbatosdev.bdevpersonalschedule.shared.schedule.InstitutionalSchedulePolicy;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -27,6 +28,7 @@ public class AvailabilityService {
     private final ProfessionalService professionalService;
     private final AvailabilityLimitsProperties limits;
     private final IntervalOperations intervalOperations;
+    private final InstitutionalSchedulePolicy institutionalSchedulePolicy;
     private final Clock clock;
 
     public AvailabilityService(
@@ -34,12 +36,14 @@ public class AvailabilityService {
         ProfessionalService professionalService,
         AvailabilityLimitsProperties limits,
         IntervalOperations intervalOperations,
+        InstitutionalSchedulePolicy institutionalSchedulePolicy,
         Clock clock
     ) {
         this.repository = repository;
         this.professionalService = professionalService;
         this.limits = limits;
         this.intervalOperations = intervalOperations;
+        this.institutionalSchedulePolicy = institutionalSchedulePolicy;
         this.clock = clock;
     }
 
@@ -48,7 +52,6 @@ public class AvailabilityService {
         validateCommand(command);
 
         List<UUID> professionalIds = command.professionalIds().stream().distinct().toList();
-        int stepMinutes = command.stepMinutes() != null ? command.stepMinutes() : limits.getDefaultStepMinutes();
 
         for (UUID professionalId : professionalIds) {
             Professional professional = professionalService.getById(professionalId);
@@ -60,12 +63,6 @@ public class AvailabilityService {
         LocalDateTime fromInclusive = command.startDate().atStartOfDay();
         LocalDateTime toExclusive = command.endDate().plusDays(1).atStartOfDay();
 
-        List<AvailabilityQueryRepository.WorkingWindowRow> windows = repository.findWorkingWindows(professionalIds);
-        List<AvailabilityQueryRepository.ScheduleExceptionRow> exceptions = repository.findExceptions(
-            professionalIds,
-            command.startDate(),
-            command.endDate()
-        );
         List<AvailabilityQueryRepository.CalendarEventRow> events = repository.findCalendarEvents(
             professionalIds,
             fromInclusive,
@@ -85,8 +82,6 @@ public class AvailabilityService {
                     professionalId,
                     command.startDate(),
                     command.endDate(),
-                    windows,
-                    exceptions,
                     events,
                     activeReservations
                 )
@@ -102,10 +97,10 @@ public class AvailabilityService {
             }
         }
 
-        List<TimeInterval> slots = intervalOperations.generateSlots(
+        List<TimeInterval> slots = generateInstitutionalSlotsWithinIntervals(
+            command.startDate(),
+            command.endDate(),
             commonIntervals,
-            command.durationMinutes(),
-            stepMinutes,
             limits.getMaxReturnedSlots()
         );
 
@@ -120,17 +115,9 @@ public class AvailabilityService {
         UUID professionalId,
         LocalDate from,
         LocalDate to,
-        List<AvailabilityQueryRepository.WorkingWindowRow> allWindows,
-        List<AvailabilityQueryRepository.ScheduleExceptionRow> allExceptions,
         List<AvailabilityQueryRepository.CalendarEventRow> allEvents,
         List<AvailabilityQueryRepository.ReservationRow> allReservations
     ) {
-        List<AvailabilityQueryRepository.WorkingWindowRow> windows = allWindows.stream()
-            .filter(window -> window.professionalId().equals(professionalId))
-            .toList();
-        List<AvailabilityQueryRepository.ScheduleExceptionRow> exceptions = allExceptions.stream()
-            .filter(exceptionEntry -> exceptionEntry.professionalId().equals(professionalId))
-            .toList();
         List<AvailabilityQueryRepository.CalendarEventRow> events = allEvents.stream()
             .filter(event -> event.professionalId().equals(professionalId))
             .toList();
@@ -138,35 +125,13 @@ public class AvailabilityService {
             .filter(reservation -> reservation.professionalId().equals(professionalId))
             .toList();
 
-        Map<Integer, List<AvailabilityQueryRepository.WorkingWindowRow>> windowsByDay = windows.stream()
-            .collect(java.util.stream.Collectors.groupingBy(AvailabilityQueryRepository.WorkingWindowRow::dayOfWeek));
-        Map<LocalDate, List<AvailabilityQueryRepository.ScheduleExceptionRow>> exceptionsByDate = exceptions.stream()
-            .collect(java.util.stream.Collectors.groupingBy(AvailabilityQueryRepository.ScheduleExceptionRow::date));
-
         List<TimeInterval> result = new ArrayList<>();
         LocalDate date = from;
         while (!date.isAfter(to)) {
             LocalDateTime dayStart = date.atStartOfDay();
             LocalDateTime dayEnd = date.plusDays(1).atStartOfDay();
 
-            List<TimeInterval> baseIntervals = new ArrayList<>();
-            for (AvailabilityQueryRepository.WorkingWindowRow window : windowsByDay.getOrDefault(date.getDayOfWeek().getValue(), List.of())) {
-                baseIntervals.add(new TimeInterval(date.atTime(window.startTime()), date.atTime(window.endTime())));
-            }
-
-            List<TimeInterval> addIntervals = new ArrayList<>();
-            List<TimeInterval> blockIntervals = new ArrayList<>();
-            for (AvailabilityQueryRepository.ScheduleExceptionRow exceptionEntry : exceptionsByDate.getOrDefault(date, List.of())) {
-                TimeInterval interval = new TimeInterval(date.atTime(exceptionEntry.startTime()), date.atTime(exceptionEntry.endTime()));
-                if ("ADD".equalsIgnoreCase(exceptionEntry.mode())) {
-                    addIntervals.add(interval);
-                } else {
-                    blockIntervals.add(interval);
-                }
-            }
-
-            List<TimeInterval> available = intervalOperations.merge(mergeLists(baseIntervals, addIntervals));
-            available = intervalOperations.subtract(available, blockIntervals);
+            List<TimeInterval> available = new ArrayList<>(institutionalSchedulePolicy.workingIntervals(date));
 
             List<TimeInterval> dayEvents = new ArrayList<>();
             for (AvailabilityQueryRepository.CalendarEventRow event : events) {
@@ -215,14 +180,44 @@ public class AvailabilityService {
             throw new IllegalArgumentException("requested date range exceeds maxRangeDays=" + limits.getMaxRangeDays());
         }
 
-        if (command.durationMinutes() <= 0) {
-            throw new IllegalArgumentException("durationMinutes must be positive");
+        if (command.durationMinutes() != institutionalSchedulePolicy.slotMinutes()) {
+            throw new IllegalArgumentException("durationMinutes must be exactly " + institutionalSchedulePolicy.slotMinutes());
         }
 
         int stepMinutes = command.stepMinutes() != null ? command.stepMinutes() : limits.getDefaultStepMinutes();
-        if (stepMinutes <= 0) {
-            throw new IllegalArgumentException("stepMinutes must be positive");
+        if (stepMinutes != institutionalSchedulePolicy.slotMinutes()) {
+            throw new IllegalArgumentException("stepMinutes must be exactly " + institutionalSchedulePolicy.slotMinutes());
         }
+    }
+
+    private List<TimeInterval> generateInstitutionalSlotsWithinIntervals(
+        LocalDate from,
+        LocalDate to,
+        List<TimeInterval> availableIntervals,
+        int maxReturnedSlots
+    ) {
+        List<TimeInterval> mergedAvailability = intervalOperations.merge(availableIntervals);
+        List<TimeInterval> slots = new ArrayList<>();
+
+        LocalDate date = from;
+        while (!date.isAfter(to)) {
+            for (TimeInterval slot : institutionalSchedulePolicy.slotIntervals(date)) {
+                boolean isCovered = mergedAvailability.stream()
+                    .anyMatch(interval ->
+                        !slot.startsAt().isBefore(interval.startsAt()) &&
+                            !slot.endsAt().isAfter(interval.endsAt())
+                    );
+                if (isCovered) {
+                    slots.add(slot);
+                    if (slots.size() >= maxReturnedSlots) {
+                        return slots;
+                    }
+                }
+            }
+            date = date.plusDays(1);
+        }
+
+        return slots;
     }
 
     private List<TimeInterval> mergeLists(List<TimeInterval> first, List<TimeInterval> second) {

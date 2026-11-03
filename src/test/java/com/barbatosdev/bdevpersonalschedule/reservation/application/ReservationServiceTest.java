@@ -6,14 +6,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
 
-import com.barbatosdev.bdevpersonalschedule.availability.domain.IntervalOperations;
-import com.barbatosdev.bdevpersonalschedule.availability.persistence.AvailabilityQueryRepository;
 import com.barbatosdev.bdevpersonalschedule.professional.application.ProfessionalService;
 import com.barbatosdev.bdevpersonalschedule.professional.domain.Professional;
 import com.barbatosdev.bdevpersonalschedule.reservation.domain.Reservation;
 import com.barbatosdev.bdevpersonalschedule.reservation.domain.ReservationStatus;
 import com.barbatosdev.bdevpersonalschedule.reservation.persistence.ReservationRepository;
 import com.barbatosdev.bdevpersonalschedule.shared.error.InvalidStatusTransitionException;
+import com.barbatosdev.bdevpersonalschedule.shared.schedule.InstitutionalSchedulePolicy;
+import com.barbatosdev.bdevpersonalschedule.shared.schedule.InstitutionalScheduleProperties;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -36,19 +36,16 @@ class ReservationServiceTest {
     @Mock
     private ProfessionalService professionalService;
 
-    @Mock
-    private AvailabilityQueryRepository availabilityQueryRepository;
-
     private ReservationService reservationService;
 
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(Instant.parse("2026-10-12T18:00:00Z"), ZoneId.of("America/Santiago"));
+        InstitutionalSchedulePolicy schedulePolicy = new InstitutionalSchedulePolicy(new InstitutionalScheduleProperties());
         reservationService = new ReservationService(
             reservationRepository,
             professionalService,
-            availabilityQueryRepository,
-            new IntervalOperations(),
+            schedulePolicy,
             clock
         );
     }
@@ -56,17 +53,14 @@ class ReservationServiceTest {
     @Test
     void createShouldRejectOutsideWorkingHours() {
         UUID professionalId = UUID.randomUUID();
-        when(professionalService.getById(professionalId)).thenReturn(activeProfessional(professionalId));
-        when(availabilityQueryRepository.findWorkingWindows(anyList())).thenReturn(List.of());
-        when(availabilityQueryRepository.findExceptions(anyList(), any(), any())).thenReturn(List.of());
 
         assertThatThrownBy(() -> reservationService.create(new CreateReservationCommand(
             List.of(professionalId),
-            LocalDateTime.parse("2026-10-19T08:00:00"),
-            LocalDateTime.parse("2026-10-19T08:45:00"),
+            LocalDateTime.parse("2026-10-19T10:15:00"),
+            LocalDateTime.parse("2026-10-19T11:00:00"),
             "CASO-001",
             "Sesion inicial"
-        ))).hasMessageContaining("outside effective working hours");
+        ))).hasMessageContaining("outside institutional schedule");
     }
 
     @Test
@@ -129,6 +123,69 @@ class ReservationServiceTest {
         assertThatThrownBy(() -> reservationService.updateMetadata(reservationId, " ", " "))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("referenceCode or description");
+    }
+
+    @Test
+    void createBatchShouldCreateAllRequestedSessions() {
+        UUID professionalId = UUID.randomUUID();
+        when(professionalService.getById(professionalId)).thenReturn(activeProfessional(professionalId));
+        when(reservationRepository.createBatchAtomic(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<Reservation> created = reservationService.createBatch(new CreateBatchReservationCommand(
+            List.of(professionalId),
+            java.time.LocalTime.parse("08:45"),
+            java.time.LocalTime.parse("09:30"),
+            "BATCH-TEST",
+            "Pack",
+            List.of(java.time.LocalDate.parse("2026-10-19"), java.time.LocalDate.parse("2026-10-20")),
+            null
+        ));
+
+        assertThat(created).hasSize(2);
+        assertThat(created.get(0).status()).isEqualTo(ReservationStatus.HOLD);
+    }
+
+    @Test
+    void createBatchShouldRejectDuplicatedSessionDates() {
+        UUID professionalId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> reservationService.createBatch(new CreateBatchReservationCommand(
+            List.of(professionalId),
+            java.time.LocalTime.parse("08:45"),
+            java.time.LocalTime.parse("09:30"),
+            "BATCH-TEST",
+            "Pack",
+            List.of(java.time.LocalDate.parse("2026-10-19"), java.time.LocalDate.parse("2026-10-19")),
+            null
+        )))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("sessionDates must not contain duplicates");
+    }
+
+    @Test
+    void createBatchWithRecurrenceShouldRespectSelectedWeekDay() {
+        UUID professionalId = UUID.randomUUID();
+        when(professionalService.getById(professionalId)).thenReturn(activeProfessional(professionalId));
+        when(reservationRepository.createBatchAtomic(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<Reservation> created = reservationService.createBatch(new CreateBatchReservationCommand(
+            List.of(professionalId),
+            java.time.LocalTime.parse("08:45"),
+            java.time.LocalTime.parse("09:30"),
+            "BATCH-FRI",
+            "Viernes",
+            null,
+            new CreateBatchReservationCommand.Recurrence(
+                java.time.LocalDate.parse("2026-10-14"),
+                5,
+                1,
+                List.of(5)
+            )
+        ));
+
+        assertThat(created).hasSize(5);
+        assertThat(created)
+            .allMatch(item -> item.startsAt().toLocalDate().getDayOfWeek().getValue() == 5);
     }
 
     private Professional activeProfessional(UUID id) {

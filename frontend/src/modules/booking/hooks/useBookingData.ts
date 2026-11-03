@@ -6,6 +6,7 @@ import {
   fetchProfessionals,
 } from '../api/professionals.api';
 import {
+  createBatchReservation,
   createReservation,
   listReservations,
   updateReservationMetadata,
@@ -14,7 +15,9 @@ import {
 import type {
   AvailabilitySearchRequest,
   AvailabilitySearchResponse,
+  BatchReservationResponse,
   CreateReservationRequest,
+  CreateBatchReservationRequest,
   Reservation,
   UpdateReservationMetadataRequest,
 } from '../types/booking.types';
@@ -59,6 +62,16 @@ export function useCreateReservationMutation() {
     CreateReservationRequest
   >({
     mutationFn: createReservation,
+  });
+}
+
+export function useCreateBatchReservationMutation() {
+  return useMutation<
+    BatchReservationResponse,
+    AxiosError<ProblemDetail>,
+    CreateBatchReservationRequest
+  >({
+    mutationFn: createBatchReservation,
   });
 }
 

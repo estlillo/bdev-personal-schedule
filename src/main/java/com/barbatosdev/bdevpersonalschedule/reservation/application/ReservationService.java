@@ -1,8 +1,5 @@
 package com.barbatosdev.bdevpersonalschedule.reservation.application;
 
-import com.barbatosdev.bdevpersonalschedule.availability.domain.IntervalOperations;
-import com.barbatosdev.bdevpersonalschedule.availability.domain.TimeInterval;
-import com.barbatosdev.bdevpersonalschedule.availability.persistence.AvailabilityQueryRepository;
 import com.barbatosdev.bdevpersonalschedule.professional.application.ProfessionalService;
 import com.barbatosdev.bdevpersonalschedule.professional.domain.Professional;
 import com.barbatosdev.bdevpersonalschedule.reservation.domain.Reservation;
@@ -11,12 +8,15 @@ import com.barbatosdev.bdevpersonalschedule.reservation.persistence.ReservationR
 import com.barbatosdev.bdevpersonalschedule.shared.error.InvalidStatusTransitionException;
 import com.barbatosdev.bdevpersonalschedule.shared.error.NotFoundException;
 import com.barbatosdev.bdevpersonalschedule.shared.error.OutsideWorkingHoursException;
+import com.barbatosdev.bdevpersonalschedule.shared.schedule.InstitutionalSchedulePolicy;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,21 +26,18 @@ public class ReservationService {
 
     private final ReservationRepository reservationRepository;
     private final ProfessionalService professionalService;
-    private final AvailabilityQueryRepository availabilityQueryRepository;
-    private final IntervalOperations intervalOperations;
+    private final InstitutionalSchedulePolicy institutionalSchedulePolicy;
     private final Clock clock;
 
     public ReservationService(
         ReservationRepository reservationRepository,
         ProfessionalService professionalService,
-        AvailabilityQueryRepository availabilityQueryRepository,
-        IntervalOperations intervalOperations,
+        InstitutionalSchedulePolicy institutionalSchedulePolicy,
         Clock clock
     ) {
         this.reservationRepository = reservationRepository;
         this.professionalService = professionalService;
-        this.availabilityQueryRepository = availabilityQueryRepository;
-        this.intervalOperations = intervalOperations;
+        this.institutionalSchedulePolicy = institutionalSchedulePolicy;
         this.clock = clock;
     }
 
@@ -66,12 +63,12 @@ public class ReservationService {
         validateBasicCommand(command);
 
         List<UUID> professionalIds = command.professionalIds().stream().distinct().toList();
+        ensureInstitutionalSlot(command.startsAt(), command.endsAt());
         for (UUID professionalId : professionalIds) {
             Professional professional = professionalService.getById(professionalId);
             if (!professional.active()) {
                 throw new IllegalArgumentException("professional is inactive: " + professionalId);
             }
-            ensureInsideWorkingHours(professionalId, command.startsAt(), command.endsAt());
         }
 
         LocalDateTime now = LocalDateTime.now(clock);
@@ -88,6 +85,45 @@ public class ReservationService {
         );
 
         return reservationRepository.createAtomic(reservation);
+    }
+
+    public List<Reservation> createBatch(CreateBatchReservationCommand command) {
+        validateBatchCommand(command);
+
+        List<LocalDate> sessionDates = resolveSessionDates(command);
+
+        List<UUID> professionalIds = command.professionalIds().stream().distinct().toList();
+        for (UUID professionalId : professionalIds) {
+            Professional professional = professionalService.getById(professionalId);
+            if (!professional.active()) {
+                throw new IllegalArgumentException("professional is inactive: " + professionalId);
+            }
+        }
+        String normalizedReferenceCode = normalizeNullableText(command.referenceCode());
+        String normalizedDescription = normalizeNullableText(command.description());
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        List<Reservation> batch = new ArrayList<>();
+        for (LocalDate sessionDate : sessionDates) {
+            LocalDateTime startsAt = sessionDate.atTime(command.startTime());
+            LocalDateTime endsAt = sessionDate.atTime(command.endTime());
+            ensureInstitutionalSlot(startsAt, endsAt);
+
+
+            batch.add(new Reservation(
+                UUID.randomUUID(),
+                startsAt,
+                endsAt,
+                ReservationStatus.HOLD,
+                normalizedReferenceCode,
+                normalizedDescription,
+                now,
+                now,
+                professionalIds
+            ));
+        }
+
+        return reservationRepository.createBatchAtomic(batch);
     }
 
     @Transactional
@@ -142,6 +178,82 @@ public class ReservationService {
         }
     }
 
+    private void validateBatchCommand(CreateBatchReservationCommand command) {
+        if (command.professionalIds() == null || command.professionalIds().isEmpty()) {
+            throw new IllegalArgumentException("professionalIds must not be empty");
+        }
+        if (command.startTime() == null || command.endTime() == null) {
+            throw new IllegalArgumentException("startTime and endTime are required");
+        }
+        if (!command.startTime().isBefore(command.endTime())) {
+            throw new IllegalArgumentException("startTime must be before endTime");
+        }
+
+        boolean hasDates = command.sessionDates() != null && !command.sessionDates().isEmpty();
+        boolean hasRecurrence = command.recurrence() != null;
+        if (hasDates == hasRecurrence) {
+            throw new IllegalArgumentException("provide either sessionDates or recurrence");
+        }
+    }
+
+    private List<LocalDate> resolveSessionDates(CreateBatchReservationCommand command) {
+        if (command.sessionDates() != null && !command.sessionDates().isEmpty()) {
+            Set<LocalDate> unique = new LinkedHashSet<>(command.sessionDates());
+            if (unique.size() != command.sessionDates().size()) {
+                throw new IllegalArgumentException("sessionDates must not contain duplicates");
+            }
+            return command.sessionDates().stream().sorted().toList();
+        }
+
+        CreateBatchReservationCommand.Recurrence recurrence = command.recurrence();
+        if (recurrence == null) {
+            throw new IllegalArgumentException("recurrence is required when sessionDates is empty");
+        }
+        if (recurrence.startDate() == null || recurrence.occurrences() == null || recurrence.intervalWeeks() == null) {
+            throw new IllegalArgumentException("recurrence.startDate, recurrence.occurrences and recurrence.intervalWeeks are required");
+        }
+        if (recurrence.occurrences() < 1) {
+            throw new IllegalArgumentException("recurrence.occurrences must be >= 1");
+        }
+        if (recurrence.intervalWeeks() < 1) {
+            throw new IllegalArgumentException("recurrence.intervalWeeks must be >= 1");
+        }
+        if (recurrence.daysOfWeek() == null || recurrence.daysOfWeek().isEmpty()) {
+            throw new IllegalArgumentException("recurrence.daysOfWeek must not be empty");
+        }
+
+        List<Integer> dayOrder = recurrence.daysOfWeek().stream()
+            .distinct()
+            .sorted()
+            .toList();
+
+        for (Integer dayOfWeek : dayOrder) {
+            if (dayOfWeek == null || dayOfWeek < 1 || dayOfWeek > 7) {
+                throw new IllegalArgumentException("recurrence.daysOfWeek must contain values from 1 to 7");
+            }
+        }
+
+        List<LocalDate> result = new ArrayList<>();
+        LocalDate firstWeekStart = recurrence.startDate().minusDays(recurrence.startDate().getDayOfWeek().getValue() - 1L);
+        LocalDate cursorWeekStart = firstWeekStart;
+
+        while (result.size() < recurrence.occurrences()) {
+            for (Integer dayOfWeek : dayOrder) {
+                LocalDate candidate = cursorWeekStart.plusDays(dayOfWeek - 1L);
+                if (candidate.isBefore(recurrence.startDate())) {
+                    continue;
+                }
+                result.add(candidate);
+                if (result.size() == recurrence.occurrences()) {
+                    break;
+                }
+            }
+            cursorWeekStart = cursorWeekStart.plusWeeks(recurrence.intervalWeeks());
+        }
+
+        return result.stream().sorted(Comparator.naturalOrder()).toList();
+    }
+
     private boolean isTransitionAllowed(ReservationStatus current, ReservationStatus target) {
         if (current == ReservationStatus.HOLD) {
             return target == ReservationStatus.CONFIRMED || target == ReservationStatus.CANCELLED;
@@ -152,55 +264,9 @@ public class ReservationService {
         return false;
     }
 
-    private void ensureInsideWorkingHours(UUID professionalId, LocalDateTime startsAt, LocalDateTime endsAt) {
-        LocalDate from = startsAt.toLocalDate();
-        LocalDate to = endsAt.toLocalDate();
-
-        List<AvailabilityQueryRepository.WorkingWindowRow> windows = availabilityQueryRepository.findWorkingWindows(List.of(professionalId));
-        List<AvailabilityQueryRepository.ScheduleExceptionRow> exceptions =
-            availabilityQueryRepository.findExceptions(List.of(professionalId), from, to);
-
-        Map<Integer, List<AvailabilityQueryRepository.WorkingWindowRow>> windowsByDay = windows.stream()
-            .collect(java.util.stream.Collectors.groupingBy(AvailabilityQueryRepository.WorkingWindowRow::dayOfWeek));
-        Map<LocalDate, List<AvailabilityQueryRepository.ScheduleExceptionRow>> exceptionsByDate = exceptions.stream()
-            .collect(java.util.stream.Collectors.groupingBy(AvailabilityQueryRepository.ScheduleExceptionRow::date));
-
-        List<TimeInterval> effectiveWorkingIntervals = new ArrayList<>();
-        LocalDate date = from;
-        while (!date.isAfter(to)) {
-            List<TimeInterval> baseIntervals = new ArrayList<>();
-            for (AvailabilityQueryRepository.WorkingWindowRow window : windowsByDay.getOrDefault(date.getDayOfWeek().getValue(), List.of())) {
-                baseIntervals.add(new TimeInterval(date.atTime(window.startTime()), date.atTime(window.endTime())));
-            }
-
-            List<TimeInterval> addIntervals = new ArrayList<>();
-            List<TimeInterval> blockIntervals = new ArrayList<>();
-            for (AvailabilityQueryRepository.ScheduleExceptionRow exceptionEntry : exceptionsByDate.getOrDefault(date, List.of())) {
-                TimeInterval exceptionInterval = new TimeInterval(
-                    date.atTime(exceptionEntry.startTime()),
-                    date.atTime(exceptionEntry.endTime())
-                );
-                if ("ADD".equalsIgnoreCase(exceptionEntry.mode())) {
-                    addIntervals.add(exceptionInterval);
-                } else {
-                    blockIntervals.add(exceptionInterval);
-                }
-            }
-
-            List<TimeInterval> merged = intervalOperations.merge(mergeLists(baseIntervals, addIntervals));
-            effectiveWorkingIntervals.addAll(intervalOperations.subtract(merged, blockIntervals));
-
-            date = date.plusDays(1);
-        }
-
-        TimeInterval requested = new TimeInterval(startsAt, endsAt);
-        boolean covered = intervalOperations.merge(effectiveWorkingIntervals).stream()
-            .anyMatch(interval -> !requested.startsAt().isBefore(interval.startsAt()) && !requested.endsAt().isAfter(interval.endsAt()));
-
-        if (!covered) {
-            throw new OutsideWorkingHoursException(
-                "Reservation interval is outside effective working hours for professional " + professionalId
-            );
+    private void ensureInstitutionalSlot(LocalDateTime startsAt, LocalDateTime endsAt) {
+        if (!institutionalSchedulePolicy.isValidInstitutionalSlot(startsAt, endsAt)) {
+            throw new OutsideWorkingHoursException("Reservation interval is outside institutional schedule");
         }
     }
 
@@ -212,10 +278,5 @@ public class ReservationService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private List<TimeInterval> mergeLists(List<TimeInterval> first, List<TimeInterval> second) {
-        List<TimeInterval> merged = new ArrayList<>(first);
-        merged.addAll(second);
-        return merged;
-    }
 }
 
