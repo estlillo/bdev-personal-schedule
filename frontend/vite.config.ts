@@ -12,4 +12,7 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    allowedHosts: ['distinguished-enthusiasm-production-cc90.up.railway.app'],
+  },
 })
